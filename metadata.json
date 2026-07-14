@@ -1,0 +1,6 @@
+{
+  "name": "OnePlug",
+  "description": "An Apple-style cinematic scroll storytelling website for OnePlug, simplifying EV charging by bringing discovery, navigation, and payments into one seamless experience.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
