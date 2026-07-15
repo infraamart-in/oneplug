@@ -121,6 +121,7 @@ export default function App() {
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const framesRef = useRef<HTMLImageElement[]>([]);
   const lastRenderedIndexRef = useRef<number>(-1);
+  const appRef = useRef<HTMLDivElement | null>(null);
   
   // DOM modification refs (for direct DOM updates yielding 60 FPS)
   const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -291,7 +292,18 @@ export default function App() {
       }
     }
     
-    if (!img) return; // No image loaded at all yet
+    if (!img) return; // No image loaded yet
+    
+    // Dynamic background matching:
+    // First 4 frames have slightly dark background tone (2, 2, 2) due to compression artifacts.
+    // The rest have (0, 0, 0). Update DOM elements directly for maximum performance.
+    const bgColor = index < 4 ? '#020202' : '#000000';
+    canvas.style.backgroundColor = bgColor;
+    document.body.style.backgroundColor = bgColor;
+    document.documentElement.style.backgroundColor = bgColor;
+    if (appRef.current) {
+      appRef.current.style.backgroundColor = bgColor;
+    }
     
     const w = canvas.width;
     const h = canvas.height;
@@ -311,7 +323,11 @@ export default function App() {
     }
     
     const x = (w - renderWidth) / 2;
-    const y = (h - renderHeight) / 2;
+    
+    // Shift animation vertically on mobile portrait view to make room for subtitles
+    const dpr = window.devicePixelRatio || 1;
+    const shiftY = isMobile ? 80 * dpr : 0;
+    const y = (h - renderHeight) / 2 - shiftY;
     
     ctx.drawImage(img, x, y, renderWidth, renderHeight);
     
@@ -828,7 +844,10 @@ export default function App() {
   const activeId = indicatorItems[activeIndex]?.id || 'hero';
 
   return (
-    <div className="relative min-h-screen bg-[#000000] text-white font-sans selection:bg-white/20 selection:text-white">
+    <div 
+      ref={appRef}
+      className="relative min-h-screen bg-[#000000] text-white font-sans selection:bg-white/20 selection:text-white"
+    >
       
       {/* 
         PRELOADING SCREEN OVERLAY
@@ -909,23 +928,23 @@ export default function App() {
           >
             {isMobile ? (
               /* Mobile Portrait Layout for Final Section: structured vertical flow */
-              <div className="w-full h-full flex flex-col justify-between px-6 pt-[10vh] pb-[8vh] text-left select-none box-border">
+              <div className="w-full h-full flex flex-col justify-start px-6 pt-[8vh] text-left select-none box-border">
                 {/* Title */}
-                <div className="w-full">
-                  <h1 className="font-display text-[36px] xs:text-[40px] sm:text-[44px] font-bold text-white leading-[1.1] max-w-[500px]">
+                <div className="w-full mb-4">
+                  <h1 className="font-display text-[32px] xs:text-[36px] sm:text-[40px] font-bold text-white leading-[1.1] max-w-[500px]">
                     Launching Soon
                   </h1>
                 </div>
                 
                 {/* Middle Animation Spacer */}
-                <div className="flex-1 min-h-[200px] max-h-[35vh] w-full" />
+                <div className="w-full aspect-[16/9] max-h-[25vh] mb-6 flex items-center justify-center" />
                 
                 {/* Subtext */}
-                <div className="w-full mt-auto flex flex-col gap-2 max-w-[500px]">
-                  <h2 className="font-sans text-xl text-white font-bold tracking-tight leading-[1.4]">
+                <div className="w-full mt-2 flex flex-col gap-2 max-w-[500px]">
+                  <h2 className="font-sans text-lg text-white font-bold tracking-tight leading-[1.4]">
                     One App. Every Charger
                   </h2>
-                  <p className="font-sans text-base text-[#A1A1AA] font-normal leading-[1.6]">
+                  <p className="font-sans text-sm sm:text-base text-[#A1A1AA] font-normal leading-[1.5]">
                     Powering the future of EV charging.
                   </p>
                 </div>

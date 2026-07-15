@@ -13,23 +13,23 @@ export default function StorySection({ section, isMobile = false }: StorySection
     <div className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden">
       {isMobile ? (
         /* Mobile Portrait Layout: structured vertical flow with top title, middle animation spacer, and bottom subtext */
-        <div className="w-full h-full flex flex-col justify-between px-6 pt-[10vh] pb-[8vh] text-left select-none box-border">
+        <div className="w-full h-full flex flex-col justify-start px-6 pt-[8vh] text-left select-none box-border">
           {/* Hero Title */}
-          <div className="w-full">
-            <h2 className="font-display text-[36px] xs:text-[40px] sm:text-[44px] font-bold text-white tracking-[-0.025em] leading-[1.1] max-w-[500px]">
+          <div className="w-full mb-4">
+            <h2 className="font-display text-[32px] xs:text-[36px] sm:text-[40px] font-bold text-white tracking-[-0.025em] leading-[1.1] max-w-[500px]">
               {section.heading}
             </h2>
           </div>
           
           {/* Middle Spacer for Horizontally/Vertically Centered Scroll Animation (Canvas) */}
-          <div className="flex-1 min-h-[200px] max-h-[35vh] w-full" />
+          <div className="w-full aspect-[16/9] max-h-[25vh] mb-6 flex items-center justify-center" />
           
           {/* Subtitle / Supporting text */}
-          <div className="w-full mt-auto">
-            <div className="font-sans text-base sm:text-lg text-[#A1A1AA] font-normal leading-[1.6] max-w-[500px]">
+          <div className="w-full mt-2">
+            <div className="font-sans text-sm sm:text-base text-[#A1A1AA] font-normal leading-[1.5] max-w-[500px]">
               {Array.isArray(section.body) ? (
                 section.body.map((paragraph, idx) => (
-                  <p key={idx} className={idx > 0 ? "mt-2" : ""}>{paragraph}</p>
+                  <p key={idx} className={idx > 0 ? "mt-1.5" : ""}>{paragraph}</p>
                 ))
               ) : (
                 <p>{section.body}</p>
