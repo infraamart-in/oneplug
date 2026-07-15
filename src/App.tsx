@@ -104,8 +104,7 @@ export default function App() {
   const [loadingPercent, setLoadingPercent] = useState(0);
   
   // Responsive mobile state tracking
-  const [isMobile, setIsMobile] = useState(false);
-  const [shouldLoadFrames, setShouldLoadFrames] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 
   // Canvas and frames caching refs
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -134,11 +133,6 @@ export default function App() {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
       
-      // If resizing from mobile to desktop, trigger frame sequence preloader
-      if (!mobile && !isLoading && framesRef.current.length === 0) {
-        setShouldLoadFrames(true);
-      }
-      
       resizeCanvas();
       
       // Force initial frame redraw on resize
@@ -154,15 +148,6 @@ export default function App() {
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
-  }, [isLoading]);
-
-  // Set initial preloading conditions on mount
-  useEffect(() => {
-    if (window.innerWidth >= 768) {
-      setShouldLoadFrames(true);
-    } else {
-      setIsLoading(false); // Mobile bypasses loading instantly
-    }
   }, []);
 
   // 4K Canvas frame renderer
@@ -175,8 +160,31 @@ export default function App() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    const img = framesRef.current[index];
-    if (!img) return;
+    const totalFrames = 420;
+    
+    // Find the nearest loaded frame to prevent black flashes or empty spaces
+    let img = framesRef.current[index];
+    if (!img) {
+      // Search backwards
+      for (let i = index - 1; i >= 0; i--) {
+        if (framesRef.current[i]) {
+          img = framesRef.current[i];
+          break;
+        }
+      }
+    }
+    
+    // If still not found, search forwards
+    if (!img) {
+      for (let i = index + 1; i < totalFrames; i++) {
+        if (framesRef.current[i]) {
+          img = framesRef.current[i];
+          break;
+        }
+      }
+    }
+    
+    if (!img) return; // No image loaded at all yet
     
     const w = canvas.width;
     const h = canvas.height;
@@ -477,10 +485,8 @@ export default function App() {
     };
   }, [isLoading, isMobile]);
 
-  // Preload and cache all 420 frames in public/
+  // Preload and cache frames in public/
   useEffect(() => {
-    if (!shouldLoadFrames) return;
-    setIsLoading(true);
     resizeCanvas();
 
     const determineFolderPath = async (primary: string, fallback: string): Promise<string> => {
@@ -497,51 +503,14 @@ export default function App() {
       });
     };
 
-    const probeAndLoadFolder = async (folderPath: string, startIdx: number, batchSize: number, onLoaded: () => void): Promise<HTMLImageElement[]> => {
-      const images: HTMLImageElement[] = [];
-      let index = startIdx;
-      let consecutiveFailures = 0;
-      
-      while (consecutiveFailures < 5) {
-        const batchPromises: Promise<{ index: number; img?: HTMLImageElement; success: boolean }>[] = [];
-        for (let i = 0; i < batchSize; i++) {
-          const frameIndex = index + i;
-          const frameStr = String(frameIndex).padStart(3, '0');
-          const url = `${folderPath}/ezgif-frame-${frameStr}.jpg`;
-          
-          batchPromises.push(new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-              onLoaded();
-              resolve({ index: frameIndex, img, success: true });
-            };
-            img.onerror = () => resolve({ index: frameIndex, success: false });
-            img.src = url;
-          }));
-        }
-        
-        const results = await Promise.all(batchPromises);
-        results.sort((a, b) => a.index - b.index);
-        
-        let stopped = false;
-        for (const result of results) {
-          if (result.success && result.img) {
-            images.push(result.img);
-            consecutiveFailures = 0;
-          } else {
-            consecutiveFailures++;
-            if (consecutiveFailures >= 5) {
-              stopped = true;
-              break;
-            }
-          }
-        }
-        
-        if (stopped) break;
-        index += batchSize;
-      }
-      
-      return images;
+    const loadSingleFrame = (folderPath: string, frameIdx: number): Promise<HTMLImageElement> => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const frameStr = String(frameIdx).padStart(3, '0');
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(`Failed to load frame ${frameIdx}`));
+        img.src = `${folderPath}/ezgif-frame-${frameStr}.jpg`;
+      });
     };
 
     const loadAllFrames = async () => {
@@ -549,29 +518,82 @@ export default function App() {
         const path1 = await determineFolderPath('video1', 'Video 1');
         const path2 = await determineFolderPath('video2', 'Video 2');
 
-        let loadedCount = 0;
-        const totalEstimated = 420;
-        const onLoaded = () => {
-          loadedCount++;
-          setLoadingPercent(Math.min(99, Math.round((loadedCount / totalEstimated) * 100)));
+        const totalFrames = 420;
+        framesRef.current = new Array(totalFrames);
+
+        if (isMobile) {
+          // Mobile loads ONLY the first frame
+          const img = await loadSingleFrame(path1, 1);
+          framesRef.current[0] = img;
+          drawFrame(0);
+          setIsLoading(false);
+          return;
+        }
+
+        // Desktop loads the first 10 frames immediately to prevent initial black screen
+        const immediateFramesCount = 10;
+        const immediatePromises: Promise<{ index: number; img: HTMLImageElement }>[] = [];
+        
+        for (let i = 1; i <= immediateFramesCount; i++) {
+          immediatePromises.push(
+            loadSingleFrame(path1, i).then(img => ({ index: i - 1, img }))
+          );
+        }
+
+        const immediateResults = await Promise.all(immediatePromises);
+        immediateResults.forEach(res => {
+          framesRef.current[res.index] = res.img;
+        });
+
+        // Draw the first frame immediately
+        drawFrame(0);
+        
+        // Hide loader immediately so the site is instantly visible and looks alive from the start!
+        setLoadingPercent(100);
+        setIsLoading(false);
+
+        // Lazy load the remaining frames in the background
+        const lazyLoadRemaining = async () => {
+          // Load Video 1 remaining
+          for (let i = 11; i <= 180; i++) {
+            try {
+              const img = await loadSingleFrame(path1, i);
+              framesRef.current[i - 1] = img;
+              
+              // If the user is currently at this scroll position, draw it immediately
+              const scrollTop = window.scrollY || document.documentElement.scrollTop;
+              const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+              const progress = maxScroll > 0 ? scrollTop / maxScroll : 0;
+              const currentFrameIndex = Math.min(totalFrames - 1, Math.max(0, Math.round(progress * (totalFrames - 1))));
+              if (currentFrameIndex === i - 1) {
+                drawFrame(currentFrameIndex);
+              }
+            } catch (err) {
+              // Ignore single frame load errors
+            }
+          }
+
+          // Load Video 2
+          for (let i = 1; i <= 240; i++) {
+            try {
+              const img = await loadSingleFrame(path2, i);
+              framesRef.current[180 + i - 1] = img;
+
+              const scrollTop = window.scrollY || document.documentElement.scrollTop;
+              const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+              const progress = maxScroll > 0 ? scrollTop / maxScroll : 0;
+              const currentFrameIndex = Math.min(totalFrames - 1, Math.max(0, Math.round(progress * (totalFrames - 1))));
+              if (currentFrameIndex === 180 + i - 1) {
+                drawFrame(currentFrameIndex);
+              }
+            } catch (err) {
+              // Ignore
+            }
+          }
         };
 
-        const [video1Frames, video2Frames] = await Promise.all([
-          probeAndLoadFolder(path1, 1, 20, onLoaded),
-          probeAndLoadFolder(path2, 1, 20, onLoaded)
-        ]);
+        lazyLoadRemaining();
 
-        const combined = [...video1Frames, ...video2Frames];
-        framesRef.current = combined;
-        
-        if (combined.length > 0) {
-          drawFrame(0);
-        }
-        
-        setLoadingPercent(100);
-        setTimeout(() => {
-          setIsLoading(false);
-        }, 300);
       } catch (err) {
         console.error('Preloading failed:', err);
         setIsLoading(false);
@@ -579,7 +601,7 @@ export default function App() {
     };
 
     loadAllFrames();
-  }, [shouldLoadFrames]);
+  }, [isMobile]);
 
   // Programmatic dot navigation smooth scroll trigger
   const scrollTo = (id: string) => {
@@ -637,12 +659,12 @@ export default function App() {
       {/* 
         BACKGROUND CANVAS RENDERER
         Fullscreen fixed background element that renders 4K frames sequentially.
-        Hidden on mobile viewports to save memory, bandwidth, and battery.
+        Maintained static on mobile to show the hero background without heavy scroll animations.
       */}
       <canvas 
         ref={canvasRef}
         id="cinematic-canvas" 
-        className={`fixed top-0 left-0 w-screen h-screen z-0 pointer-events-none ${isMobile ? 'hidden' : 'block'}`}
+        className="fixed top-0 left-0 w-screen h-screen z-0 pointer-events-none block"
       />
 
       {/* 
@@ -661,7 +683,7 @@ export default function App() {
                 visibility: idx === 0 ? 'visible' : 'hidden',
                 pointerEvents: idx === 0 ? 'auto' : 'none',
               }}
-              className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden transition-opacity duration-[100ms] ease-out"
+              className={`absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden transition-opacity duration-[100ms] ease-out ${isMobile && idx !== 0 ? 'bg-black' : 'bg-transparent'}`}
             >
               <StorySection 
                 section={section} 
@@ -680,7 +702,7 @@ export default function App() {
               visibility: 'hidden',
               pointerEvents: 'none',
             }}
-            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden transition-opacity duration-[100ms] ease-out"
+            className={`absolute inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden transition-opacity duration-[100ms] ease-out ${isMobile ? 'bg-black' : 'bg-transparent'}`}
           >
             {isMobile ? (
               /* Mobile Portrait Layout for Final Section */
