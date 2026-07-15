@@ -160,7 +160,7 @@ export default function App() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    const totalFrames = 420;
+    const totalFrames = 421;
     
     // Find the nearest loaded frame to prevent black flashes or empty spaces
     let img = framesRef.current[index];
@@ -489,41 +489,24 @@ export default function App() {
   useEffect(() => {
     resizeCanvas();
 
-    const determineFolderPath = async (primary: string, fallback: string): Promise<string> => {
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve(primary);
-        img.onerror = () => {
-          const img2 = new Image();
-          img2.onload = () => resolve(fallback);
-          img2.onerror = () => resolve(primary);
-          img2.src = `${fallback}/ezgif-frame-001.jpg`;
-        };
-        img.src = `${primary}/ezgif-frame-001.jpg`;
-      });
-    };
-
-    const loadSingleFrame = (folderPath: string, frameIdx: number): Promise<HTMLImageElement> => {
+    const loadSingleFrame = (frameIdx: number): Promise<HTMLImageElement> => {
       return new Promise((resolve, reject) => {
         const img = new Image();
-        const frameStr = String(frameIdx).padStart(3, '0');
+        const frameStr = String(frameIdx).padStart(4, '0');
         img.onload = () => resolve(img);
         img.onerror = () => reject(new Error(`Failed to load frame ${frameIdx}`));
-        img.src = `${folderPath}/ezgif-frame-${frameStr}.jpg`;
+        img.src = `oneplug_bg_frames/frame_${frameStr}.jpg`;
       });
     };
 
     const loadAllFrames = async () => {
       try {
-        const path1 = await determineFolderPath('video1', 'Video 1');
-        const path2 = await determineFolderPath('video2', 'Video 2');
-
-        const totalFrames = 420;
+        const totalFrames = 421;
         framesRef.current = new Array(totalFrames);
 
         if (isMobile) {
           // Mobile loads ONLY the first frame
-          const img = await loadSingleFrame(path1, 1);
+          const img = await loadSingleFrame(1);
           framesRef.current[0] = img;
           drawFrame(0);
           setIsLoading(false);
@@ -536,7 +519,7 @@ export default function App() {
         
         for (let i = 1; i <= immediateFramesCount; i++) {
           immediatePromises.push(
-            loadSingleFrame(path1, i).then(img => ({ index: i - 1, img }))
+            loadSingleFrame(i).then(img => ({ index: i - 1, img }))
           );
         }
 
@@ -554,10 +537,9 @@ export default function App() {
 
         // Lazy load the remaining frames in the background
         const lazyLoadRemaining = async () => {
-          // Load Video 1 remaining
-          for (let i = 11; i <= 180; i++) {
+          for (let i = 11; i <= totalFrames; i++) {
             try {
-              const img = await loadSingleFrame(path1, i);
+              const img = await loadSingleFrame(i);
               framesRef.current[i - 1] = img;
               
               // If the user is currently at this scroll position, draw it immediately
@@ -570,24 +552,6 @@ export default function App() {
               }
             } catch (err) {
               // Ignore single frame load errors
-            }
-          }
-
-          // Load Video 2
-          for (let i = 1; i <= 240; i++) {
-            try {
-              const img = await loadSingleFrame(path2, i);
-              framesRef.current[180 + i - 1] = img;
-
-              const scrollTop = window.scrollY || document.documentElement.scrollTop;
-              const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-              const progress = maxScroll > 0 ? scrollTop / maxScroll : 0;
-              const currentFrameIndex = Math.min(totalFrames - 1, Math.max(0, Math.round(progress * (totalFrames - 1))));
-              if (currentFrameIndex === 180 + i - 1) {
-                drawFrame(currentFrameIndex);
-              }
-            } catch (err) {
-              // Ignore
             }
           }
         };
