@@ -121,6 +121,7 @@ export default function App() {
   const touchStartRef = useRef<number>(0);
   const activeIndexRef = useRef<number>(0);
   const isTransitioningRef = useRef<boolean>(false);
+  const scrollAnimationRef = useRef<number | null>(null);
 
   // Sync active states with refs for use in stable event listeners
   useEffect(() => {
@@ -178,6 +179,33 @@ export default function App() {
       }
     }
   }, [isLoading]);
+
+  // Cancel programmatic scroll animation when user scrolls manually
+  useEffect(() => {
+    const cancelScrollAnimation = () => {
+      if (scrollAnimationRef.current) {
+        cancelAnimationFrame(scrollAnimationRef.current);
+        scrollAnimationRef.current = null;
+      }
+    };
+
+    window.addEventListener('wheel', cancelScrollAnimation, { passive: true });
+    window.addEventListener('touchstart', cancelScrollAnimation, { passive: true });
+    
+    const preventKeys = (e: KeyboardEvent) => {
+      const keys = ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End'];
+      if (keys.includes(e.code) || e.key === ' ') {
+        cancelScrollAnimation();
+      }
+    };
+    window.addEventListener('keydown', preventKeys, { passive: true });
+
+    return () => {
+      window.removeEventListener('wheel', cancelScrollAnimation);
+      window.removeEventListener('touchstart', cancelScrollAnimation);
+      window.removeEventListener('keydown', preventKeys);
+    };
+  }, []);
 
   // Monitor viewport size and handle responsive layout changes
   useEffect(() => {
@@ -631,6 +659,41 @@ export default function App() {
     loadAllFrames();
   }, [isMobile]);
 
+  // Eased programmatic smooth scrolling
+  const animateScrollTo = (targetScrollTop: number, duration = 1500) => {
+    const startScrollTop = window.scrollY || document.documentElement.scrollTop;
+    const distance = targetScrollTop - startScrollTop;
+    if (distance === 0) return;
+
+    const startTime = performance.now();
+
+    // easeInOutQuart for a smooth, premium, cinematic camera motion profile
+    const easeInOutQuart = (t: number): number => {
+      return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
+    };
+
+    const step = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1.0);
+      
+      const easedProgress = easeInOutQuart(progress);
+      const currentScrollTop = startScrollTop + distance * easedProgress;
+
+      window.scrollTo(0, currentScrollTop);
+
+      if (progress < 1.0) {
+        scrollAnimationRef.current = requestAnimationFrame(step);
+      } else {
+        scrollAnimationRef.current = null;
+      }
+    };
+
+    if (scrollAnimationRef.current) {
+      cancelAnimationFrame(scrollAnimationRef.current);
+    }
+    scrollAnimationRef.current = requestAnimationFrame(step);
+  };
+
   // Programmatic dot navigation smooth scroll trigger
   const scrollTo = (id: string) => {
     const targetIndex = indicatorItems.findIndex(item => item.id === id);
@@ -642,10 +705,8 @@ export default function App() {
       const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
       const targetScrollTop = (targetIndex / (indicatorItems.length - 1)) * maxScroll;
       
-      window.scrollTo({
-        top: targetScrollTop,
-        behavior: 'smooth'
-      });
+      // Smoothly transition with our premium eased animator
+      animateScrollTo(targetScrollTop, 1500);
     }
   };
 
@@ -783,11 +844,12 @@ export default function App() {
               <div key={item.id} className="relative flex items-center group">
                 <button
                   onClick={() => scrollTo(item.id)}
-                  className={`rounded-full transition-all duration-500 cursor-pointer ${
+                  className={`rounded-full cursor-pointer transition-all duration-300 ease-out border-0 outline-none focus-visible:ring-2 focus-visible:ring-[#00D2A0] focus-visible:ring-offset-2 focus-visible:ring-offset-black ${
                     isActive 
-                      ? 'w-1 md:w-1.5 h-6 md:h-8 bg-[#00D2A0] shadow-[0_0_8px_rgba(0,210,160,0.4)]' 
-                      : 'w-0.5 md:w-1 h-3 md:h-4 bg-white/30 hover:bg-white/70'
+                      ? 'w-2.5 md:w-3.5 h-2.5 md:h-3.5 bg-[#00D2A0] shadow-[0_0_12px_rgba(0,210,160,0.8)] scale-110' 
+                      : 'w-1.5 md:w-2 h-1.5 md:h-2 bg-white/20 hover:bg-white/60 scale-100'
                   }`}
+                  aria-label={`Go to ${item.label}`}
                   title={item.label}
                 />
                 
