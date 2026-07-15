@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SectionContent } from './types';
 import StorySection from './components/StorySection';
@@ -53,6 +53,16 @@ const indicatorItems = [
 ];
 
 const PIXELS_PER_FRAME = 15;
+const TOTAL_FRAMES = 421;
+const MOBILE_ANCHOR_INDICES = [0, 84, 168, 252, 336, 420];
+const MOBILE_ANCHOR_SET = new Set(MOBILE_ANCHOR_INDICES);
+
+// Hoisted easing functions — pure math, no allocations inside rAF loops
+const easeInOutCubic = (t: number): number =>
+  t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+
+const easeInOutQuart = (t: number): number =>
+  t < 0.5 ? 8 * t * t * t * t : 1 - (-2 * t + 2) ** 4 / 2;
 
 // Disjoint localized opacity calculation function: Persistent text (0-70%), Outgoing fades (70-82%), Buffer gap (82-88%), Incoming fades (88-100%)
 const getSectionOpacity = (index: number, progress: number, totalSections: number) => {
@@ -108,6 +118,7 @@ export default function App() {
 
   // Canvas and frames caching refs
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const framesRef = useRef<HTMLImageElement[]>([]);
   const lastRenderedIndexRef = useRef<number>(-1);
   
@@ -128,6 +139,20 @@ export default function App() {
   useEffect(() => {
     activeIndexRef.current = activeIndex;
   }, [activeIndex]);
+
+  // Clean up rAF animations on unmount to prevent stale ref access
+  useEffect(() => {
+    return () => {
+      if (mobileFrameAnimRef.current) {
+        cancelAnimationFrame(mobileFrameAnimRef.current);
+        mobileFrameAnimRef.current = null;
+      }
+      if (scrollAnimationRef.current) {
+        cancelAnimationFrame(scrollAnimationRef.current);
+        scrollAnimationRef.current = null;
+      }
+    };
+  }, []);
 
   // Prevent all early interactions (scrolls, keys, gestures, pointer events, focus) during loading
   useEffect(() => {
@@ -216,13 +241,18 @@ export default function App() {
       
       resizeCanvas();
       
-      // Force initial frame redraw on resize
-      if (!mobile && framesRef.current.length > 0) {
-        const scrollTop = window.scrollY || document.documentElement.scrollTop;
-        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-        const progress = maxScroll > 0 ? scrollTop / maxScroll : 0;
-        const frameIndex = Math.min(framesRef.current.length - 1, Math.max(0, Math.round(progress * (framesRef.current.length - 1))));
-        drawFrame(frameIndex);
+      // Force frame redraw on resize for both desktop and mobile
+      if (framesRef.current.length > 0) {
+        if (mobile) {
+          const frameIndex = Math.round(420 * activeIndexRef.current / 5);
+          drawFrame(frameIndex);
+        } else {
+          const scrollTop = window.scrollY || document.documentElement.scrollTop;
+          const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+          const progress = maxScroll > 0 ? scrollTop / maxScroll : 0;
+          const frameIndex = Math.min(framesRef.current.length - 1, Math.max(0, Math.round(progress * (framesRef.current.length - 1))));
+          drawFrame(frameIndex);
+        }
       }
     };
 
@@ -231,17 +261,13 @@ export default function App() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // 4K Canvas frame renderer
+  // 4K Canvas frame renderer — uses cached context ref for zero-overhead draws
   const drawFrame = (index: number) => {
     if (index === lastRenderedIndexRef.current) return;
     
+    const ctx = ctxRef.current;
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    const totalFrames = 421;
+    if (!ctx || !canvas) return;
     
     // Find the nearest loaded frame to prevent black flashes or empty spaces
     let img = framesRef.current[index];
@@ -257,7 +283,7 @@ export default function App() {
     
     // If still not found, search forwards
     if (!img) {
-      for (let i = index + 1; i < totalFrames; i++) {
+      for (let i = index + 1; i < TOTAL_FRAMES; i++) {
         if (framesRef.current[i]) {
           img = framesRef.current[i];
           break;
@@ -270,8 +296,7 @@ export default function App() {
     const w = canvas.width;
     const h = canvas.height;
     
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, w, h);
+    ctx.clearRect(0, 0, w, h);
     
     const imgRatio = img.width / img.height;
     const canvasRatio = w / h;
@@ -288,8 +313,6 @@ export default function App() {
     const x = (w - renderWidth) / 2;
     const y = (h - renderHeight) / 2;
     
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(img, x, y, renderWidth, renderHeight);
     
     lastRenderedIndexRef.current = index;
@@ -301,6 +324,17 @@ export default function App() {
     const dpr = window.devicePixelRatio || 1;
     canvas.width = window.innerWidth * dpr;
     canvas.height = window.innerHeight * dpr;
+    
+    // Obtain and cache the 2D context with smoothing configured once
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctxRef.current = ctx;
+    }
+    
+    // Reset cached frame index so the next drawFrame call will actually redraw
+    lastRenderedIndexRef.current = -1;
   };
 
   // Manage native scrolling and height adjustments on loading cycle completion
@@ -436,10 +470,6 @@ export default function App() {
     const step = (currentTime: number) => {
       const elapsed = currentTime - startTime;
       const progress = Math.min(elapsed / duration, 1.0);
-      
-      const easeInOutCubic = (t: number): number => {
-        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-      };
       const easedProgress = easeInOutCubic(progress);
       const currentFrame = Math.round(startFrame + diff * easedProgress);
       drawFrame(currentFrame);
@@ -487,7 +517,7 @@ export default function App() {
       if (elNext) {
         elNext.style.visibility = 'visible';
         elNext.style.transition = 'opacity 220ms ease-in-out';
-        elNext.getBoundingClientRect(); // force layout reflow
+        void elNext.offsetHeight; // force layout reflow
         elNext.style.opacity = '1';
         elNext.style.pointerEvents = 'auto';
       }
@@ -528,7 +558,7 @@ export default function App() {
       if (elNext) {
         elNext.style.visibility = 'visible';
         elNext.style.transition = 'opacity 220ms ease-in-out';
-        elNext.getBoundingClientRect();
+        void elNext.offsetHeight; // force layout reflow
         elNext.style.opacity = '1';
         elNext.style.pointerEvents = 'auto';
       }
@@ -643,12 +673,10 @@ export default function App() {
 
     const loadAllFrames = async () => {
       try {
-        const totalFrames = 421;
-        framesRef.current = new Array(totalFrames);
+        framesRef.current = new Array(TOTAL_FRAMES);
 
         // Fallback Timeout: 15 seconds
         const timeoutId = setTimeout(() => {
-          console.warn('Preloading timed out. Entering website with available assets.');
           if (framesRef.current[0]) {
             drawFrame(0);
           }
@@ -658,17 +686,16 @@ export default function App() {
         if (isMobile) {
           // Mobile Progressive Loader:
           // 1. Load the 6 critical section anchor frames first
-          const anchors = [0, 84, 168, 252, 336, 420];
           let loadedAnchorsCount = 0;
           
-          const anchorPromises = anchors.map(async (idx) => {
+          const anchorPromises = MOBILE_ANCHOR_INDICES.map(async (idx) => {
             try {
               const img = await loadSingleFrameWithRetry(idx + 1);
               framesRef.current[idx] = img;
               loadedAnchorsCount++;
-              setLoadingPercent(Math.round((loadedAnchorsCount / anchors.length) * 100));
-            } catch (err) {
-              console.error(`Failed to load anchor frame ${idx + 1}`, err);
+              setLoadingPercent(Math.round((loadedAnchorsCount / MOBILE_ANCHOR_INDICES.length) * 100));
+            } catch {
+              // Silently handle anchor frame load failures
             }
           });
           
@@ -681,8 +708,8 @@ export default function App() {
           const lazyLoadRemaining = async () => {
             const batchSize = 5;
             const remainingIndices: number[] = [];
-            for (let i = 0; i < totalFrames; i++) {
-              if (!anchors.includes(i)) {
+            for (let i = 0; i < TOTAL_FRAMES; i++) {
+              if (!MOBILE_ANCHOR_SET.has(i)) {
                 remainingIndices.push(i);
               }
             }
@@ -694,7 +721,7 @@ export default function App() {
                   try {
                     const img = await loadSingleFrameWithRetry(idx + 1);
                     framesRef.current[idx] = img;
-                  } catch (err) {
+                  } catch {
                     // Fail silently for background lazy loads
                   }
                 })
@@ -709,33 +736,37 @@ export default function App() {
           return;
         }
 
-        // Desktop loads ALL 421 frames in parallel
+        // Desktop loads frames in batches of 20 to avoid overwhelming the connection pool
         let loadedCount = 0;
-        const promises = [];
+        const batchSize = 20;
         
-        for (let i = 1; i <= totalFrames; i++) {
-          promises.push(
-            loadSingleFrameWithRetry(i)
-              .then(img => {
-                framesRef.current[i - 1] = img;
-                loadedCount++;
-                setLoadingPercent(Math.round((loadedCount / totalFrames) * 100));
-              })
-              .catch(err => {
-                console.warn(`Failed to preload frame ${i}`, err);
-              })
-          );
+        for (let batchStart = 1; batchStart <= TOTAL_FRAMES; batchStart += batchSize) {
+          const batchEnd = Math.min(batchStart + batchSize, TOTAL_FRAMES + 1);
+          const batchPromises = [];
+          
+          for (let i = batchStart; i < batchEnd; i++) {
+            batchPromises.push(
+              loadSingleFrameWithRetry(i)
+                .then(img => {
+                  framesRef.current[i - 1] = img;
+                  loadedCount++;
+                  setLoadingPercent(Math.round((loadedCount / TOTAL_FRAMES) * 100));
+                })
+                .catch(() => {
+                  // Silently handle frame load failures
+                })
+            );
+          }
+          
+          await Promise.all(batchPromises);
         }
-
-        await Promise.all(promises);
 
         // Draw the first frame immediately
         drawFrame(0);
         
         clearTimeout(timeoutId);
         setIsLoading(false);
-      } catch (err) {
-        console.error('Preloading failed:', err);
+      } catch {
         setIsLoading(false);
       }
     };
@@ -751,15 +782,9 @@ export default function App() {
 
     const startTime = performance.now();
 
-    // easeInOutQuart for a smooth, premium, cinematic camera motion profile
-    const easeInOutQuart = (t: number): number => {
-      return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
-    };
-
     const step = (currentTime: number) => {
       const elapsed = currentTime - startTime;
       const progress = Math.min(elapsed / duration, 1.0);
-      
       const easedProgress = easeInOutQuart(progress);
       const currentScrollTop = startScrollTop + distance * easedProgress;
 
@@ -832,12 +857,12 @@ export default function App() {
       {/* 
         BACKGROUND CANVAS RENDERER
         Fullscreen fixed background element that renders 4K frames sequentially.
-        Maintained static on mobile to show the hero background without heavy scroll animations.
+        CSS bg-black provides the black clear-fill; clearRect is used for performance.
       */}
       <canvas 
         ref={canvasRef}
         id="cinematic-canvas" 
-        className="fixed top-0 left-0 w-screen h-screen z-0 pointer-events-none block"
+        className="fixed top-0 left-0 w-screen h-screen z-0 pointer-events-none block bg-black"
       />
 
       {/* 
@@ -856,12 +881,11 @@ export default function App() {
                 visibility: idx === 0 ? 'visible' : 'hidden',
                 pointerEvents: idx === 0 ? 'auto' : 'none',
               }}
-              className={`absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden transition-opacity duration-[100ms] ease-out bg-transparent`}
+              className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden transition-opacity duration-[100ms] ease-out bg-transparent"
             >
               <StorySection 
                 section={section} 
-                index={idx} 
-                opacity={1}
+                index={idx}
                 isMobile={isMobile}
               />
             </div>
@@ -875,7 +899,7 @@ export default function App() {
               visibility: 'hidden',
               pointerEvents: 'none',
             }}
-            className={`absolute inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden transition-opacity duration-[100ms] ease-out bg-transparent`}
+            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden transition-opacity duration-[100ms] ease-out bg-transparent"
           >
             {isMobile ? (
               /* Mobile Portrait Layout for Final Section: structured vertical flow */

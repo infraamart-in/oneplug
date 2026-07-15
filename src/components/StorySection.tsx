@@ -1,26 +1,16 @@
-import React from 'react';
 import { SectionContent } from '../types';
 
 interface StorySectionProps {
   section: SectionContent;
   index: number;
-  opacity: number;
   isMobile?: boolean;
-  key?: string | number | React.Key;
 }
 
-export default function StorySection({ section, index, opacity, isMobile = false }: StorySectionProps) {
+export default function StorySection({ section, isMobile = false }: StorySectionProps) {
   const isLeftAligned = section.position === 'left' || isMobile;
 
   return (
-    <div
-      style={{
-        opacity,
-        pointerEvents: opacity > 0.5 ? 'auto' : 'none',
-        transition: 'opacity 800ms ease-in-out',
-      }}
-      className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden"
-    >
+    <div className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden">
       {isMobile ? (
         /* Mobile Portrait Layout: structured vertical flow with top title, middle animation spacer, and bottom subtext */
         <div className="w-full h-full flex flex-col justify-between px-6 pt-[10vh] pb-[8vh] text-left select-none box-border">
