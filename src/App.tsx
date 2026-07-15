@@ -819,6 +819,12 @@ export default function App() {
     }
   };
 
+  const handleScrollIndicatorClick = () => {
+    if (activeIndex < indicatorItems.length - 1) {
+      scrollTo(indicatorItems[activeIndex + 1].id);
+    }
+  };
+
   const activeId = indicatorItems[activeIndex]?.id || 'hero';
 
   return (
@@ -1015,6 +1021,49 @@ export default function App() {
           isOpen={isContactOpen} 
           onClose={() => setIsContactOpen(false)} 
         />
+      )}
+
+      {/* Minimal Scroll Down Indicator */}
+      {!isLoading && (
+        <AnimatePresence>
+          {activeId !== 'final-section' && (
+            <motion.button
+              initial={{ opacity: 0, y: 10, x: '-50%' }}
+              animate={{ opacity: 1, y: 0, x: '-50%' }}
+              exit={{ opacity: 0, y: 10, x: '-50%' }}
+              transition={{ duration: 0.4, ease: 'easeInOut' }}
+              onClick={handleScrollIndicatorClick}
+              className="fixed bottom-8 left-1/2 z-40 flex flex-col items-center cursor-pointer pointer-events-auto border-0 bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-[#00D2A0] rounded-full p-2 text-white/50 hover:text-white transition-colors duration-300"
+              aria-label="Scroll down to next section"
+            >
+              <motion.div
+                animate={{
+                  y: [0, 8, 0]
+                }}
+                transition={{
+                  duration: 1.4,
+                  ease: 'easeInOut',
+                  repeat: Infinity
+                }}
+              >
+                {/* Minimal thin downward arrow icon */}
+                <svg
+                  width={isMobile ? "20" : "24"}
+                  height={isMobile ? "20" : "24"}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <polyline points="19 12 12 19 5 12"></polyline>
+                </svg>
+              </motion.div>
+            </motion.button>
+          )}
+        </AnimatePresence>
       )}
     </div>
   );
