@@ -127,6 +127,58 @@ export default function App() {
     activeIndexRef.current = activeIndex;
   }, [activeIndex]);
 
+  // Prevent all early interactions (scrolls, keys, gestures, pointer events, focus) during loading
+  useEffect(() => {
+    if (!isLoading) return;
+
+    const preventDefault = (e: Event) => {
+      e.preventDefault();
+    };
+
+    const preventKeys = (e: KeyboardEvent) => {
+      const keys = ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End'];
+      if (keys.includes(e.code) || e.key === ' ') {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('wheel', preventDefault, { passive: false });
+    window.addEventListener('touchmove', preventDefault, { passive: false });
+    window.addEventListener('keydown', preventKeys, { passive: false });
+
+    // Focus Lock
+    const activeEl = document.activeElement as HTMLElement;
+    if (activeEl) activeEl.blur();
+
+    const handleFocus = (e: FocusEvent) => {
+      e.preventDefault();
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    };
+    document.addEventListener('focusin', handleFocus);
+
+    return () => {
+      window.removeEventListener('wheel', preventDefault);
+      window.removeEventListener('touchmove', preventDefault);
+      window.removeEventListener('keydown', preventKeys);
+      document.removeEventListener('focusin', handleFocus);
+    };
+  }, [isLoading]);
+
+  // Reset scroll position on loading screen complete
+  useEffect(() => {
+    if (!isLoading) {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      
+      if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
+      }
+    }
+  }, [isLoading]);
+
   // Monitor viewport size and handle responsive layout changes
   useEffect(() => {
     const checkMobile = () => {
@@ -489,14 +541,36 @@ export default function App() {
   useEffect(() => {
     resizeCanvas();
 
-    const loadSingleFrame = (frameIdx: number): Promise<HTMLImageElement> => {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        const frameStr = String(frameIdx).padStart(4, '0');
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error(`Failed to load frame ${frameIdx}`));
-        img.src = `oneplug_bg_frames/frame_${frameStr}.jpg`;
-      });
+    const loadSingleFrameWithRetry = (frameIdx: number, retries = 3): Promise<HTMLImageElement> => {
+      const frameStr = String(frameIdx).padStart(4, '0');
+      const url = `oneplug_bg_frames/frame_${frameStr}.jpg`;
+      
+      const attempt = (remaining: number): Promise<HTMLImageElement> => {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            if ('decode' in img) {
+              img.decode()
+                .then(() => resolve(img))
+                .catch(() => resolve(img));
+            } else {
+              resolve(img);
+            }
+          };
+          img.onerror = () => {
+            if (remaining > 0) {
+              setTimeout(() => {
+                attempt(remaining - 1).then(resolve).catch(reject);
+              }, 100);
+            } else {
+              reject(new Error(`Failed to load frame ${frameIdx}`));
+            }
+          };
+          img.src = url;
+        });
+      };
+      
+      return attempt(retries);
     };
 
     const loadAllFrames = async () => {
@@ -504,60 +578,50 @@ export default function App() {
         const totalFrames = 421;
         framesRef.current = new Array(totalFrames);
 
+        // Fallback Timeout: 15 seconds
+        const timeoutId = setTimeout(() => {
+          console.warn('Preloading timed out. Entering website with available assets.');
+          if (framesRef.current[0]) {
+            drawFrame(0);
+          }
+          setIsLoading(false);
+        }, 15000);
+
         if (isMobile) {
           // Mobile loads ONLY the first frame
-          const img = await loadSingleFrame(1);
+          const img = await loadSingleFrameWithRetry(1);
           framesRef.current[0] = img;
           drawFrame(0);
+          clearTimeout(timeoutId);
           setIsLoading(false);
           return;
         }
 
-        // Desktop loads the first 10 frames immediately to prevent initial black screen
-        const immediateFramesCount = 10;
-        const immediatePromises: Promise<{ index: number; img: HTMLImageElement }>[] = [];
+        // Desktop loads ALL 421 frames in parallel
+        let loadedCount = 0;
+        const promises = [];
         
-        for (let i = 1; i <= immediateFramesCount; i++) {
-          immediatePromises.push(
-            loadSingleFrame(i).then(img => ({ index: i - 1, img }))
+        for (let i = 1; i <= totalFrames; i++) {
+          promises.push(
+            loadSingleFrameWithRetry(i)
+              .then(img => {
+                framesRef.current[i - 1] = img;
+                loadedCount++;
+                setLoadingPercent(Math.round((loadedCount / totalFrames) * 100));
+              })
+              .catch(err => {
+                console.warn(`Failed to preload frame ${i}`, err);
+              })
           );
         }
 
-        const immediateResults = await Promise.all(immediatePromises);
-        immediateResults.forEach(res => {
-          framesRef.current[res.index] = res.img;
-        });
+        await Promise.all(promises);
 
         // Draw the first frame immediately
         drawFrame(0);
         
-        // Hide loader immediately so the site is instantly visible and looks alive from the start!
-        setLoadingPercent(100);
+        clearTimeout(timeoutId);
         setIsLoading(false);
-
-        // Lazy load the remaining frames in the background
-        const lazyLoadRemaining = async () => {
-          for (let i = 11; i <= totalFrames; i++) {
-            try {
-              const img = await loadSingleFrame(i);
-              framesRef.current[i - 1] = img;
-              
-              // If the user is currently at this scroll position, draw it immediately
-              const scrollTop = window.scrollY || document.documentElement.scrollTop;
-              const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-              const progress = maxScroll > 0 ? scrollTop / maxScroll : 0;
-              const currentFrameIndex = Math.min(totalFrames - 1, Math.max(0, Math.round(progress * (totalFrames - 1))));
-              if (currentFrameIndex === i - 1) {
-                drawFrame(currentFrameIndex);
-              }
-            } catch (err) {
-              // Ignore single frame load errors
-            }
-          }
-        };
-
-        lazyLoadRemaining();
-
       } catch (err) {
         console.error('Preloading failed:', err);
         setIsLoading(false);
@@ -600,22 +664,22 @@ export default function App() {
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.8, ease: 'easeInOut' }}
-            className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center pointer-events-auto"
+            className="fixed inset-0 z-50 bg-black flex items-center justify-center pointer-events-auto"
           >
-            <div className="flex flex-col items-center gap-6 select-none">
-              <OnePlugLogo className="w-[180px] sm:w-[220px] h-auto text-white animate-pulse" />
-              <div className="flex flex-col items-center gap-2 mt-4">
-                <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-[#8E8E93] font-medium">
-                  Loading // {loadingPercent}%
-                </span>
-                <div className="w-[140px] sm:w-[180px] h-[1.5px] bg-white/10 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-[#00D2A0] rounded-full transition-all duration-300 ease-out" 
-                    style={{ width: `${loadingPercent}%` }}
-                  />
-                </div>
-              </div>
-            </div>
+            <motion.div
+              animate={{
+                scale: [0.98, 1.0, 0.98],
+                opacity: [0.6, 1.0, 0.6]
+              }}
+              transition={{
+                duration: 2.0,
+                ease: 'easeInOut',
+                repeat: Infinity
+              }}
+              className="relative flex items-center justify-center select-none"
+            >
+              <OnePlugLogo className="w-[200px] sm:w-[240px] h-auto text-white" />
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
