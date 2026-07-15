@@ -122,6 +122,7 @@ export default function App() {
   const activeIndexRef = useRef<number>(0);
   const isTransitioningRef = useRef<boolean>(false);
   const scrollAnimationRef = useRef<number | null>(null);
+  const mobileFrameAnimRef = useRef<number | null>(null);
 
   // Sync active states with refs for use in stable event listeners
   useEffect(() => {
@@ -423,6 +424,39 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [isLoading, isMobile]);
 
+  // Programmatic mobile frame sequence interpolation animator
+  const animateMobileFrames = (fromIndex: number, toIndex: number, duration = 440) => {
+    const startFrame = Math.round(420 * fromIndex / 5);
+    const targetFrame = Math.round(420 * toIndex / 5);
+    const diff = targetFrame - startFrame;
+    if (diff === 0) return;
+
+    const startTime = performance.now();
+
+    const step = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1.0);
+      
+      const easeInOutCubic = (t: number): number => {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      };
+      const easedProgress = easeInOutCubic(progress);
+      const currentFrame = Math.round(startFrame + diff * easedProgress);
+      drawFrame(currentFrame);
+
+      if (progress < 1.0) {
+        mobileFrameAnimRef.current = requestAnimationFrame(step);
+      } else {
+        mobileFrameAnimRef.current = null;
+      }
+    };
+
+    if (mobileFrameAnimRef.current) {
+      cancelAnimationFrame(mobileFrameAnimRef.current);
+    }
+    mobileFrameAnimRef.current = requestAnimationFrame(step);
+  };
+
   // Programmatic transitions on Mobile (swipe triggers)
   const triggerMobileTransition = (direction: number) => {
     const nextIndex = activeIndexRef.current + direction;
@@ -432,6 +466,9 @@ export default function App() {
     isTransitioningRef.current = true;
     
     const currIdx = activeIndexRef.current;
+    
+    // Animate background sequence frames in sync with mobile scroll transition
+    animateMobileFrames(currIdx, nextIndex, 440);
     
     // 1. Fade out current section
     const elCurr = sectionRefs.current[currIdx] || (currIdx === sectionsData.length ? finalSectionRef.current : null);
@@ -470,6 +507,9 @@ export default function App() {
     
     lastTransitionTimeRef.current = performance.now();
     isTransitioningRef.current = true;
+    
+    // Animate background sequence frames in sync with mobile jump transition
+    animateMobileFrames(currIdx, targetIndex, 440);
     
     // 1. Fade out current section
     const elCurr = sectionRefs.current[currIdx] || (currIdx === sectionsData.length ? finalSectionRef.current : null);
@@ -616,12 +656,56 @@ export default function App() {
         }, 15000);
 
         if (isMobile) {
-          // Mobile loads ONLY the first frame
-          const img = await loadSingleFrameWithRetry(1);
-          framesRef.current[0] = img;
+          // Mobile Progressive Loader:
+          // 1. Load the 6 critical section anchor frames first
+          const anchors = [0, 84, 168, 252, 336, 420];
+          let loadedAnchorsCount = 0;
+          
+          const anchorPromises = anchors.map(async (idx) => {
+            try {
+              const img = await loadSingleFrameWithRetry(idx + 1);
+              framesRef.current[idx] = img;
+              loadedAnchorsCount++;
+              setLoadingPercent(Math.round((loadedAnchorsCount / anchors.length) * 100));
+            } catch (err) {
+              console.error(`Failed to load anchor frame ${idx + 1}`, err);
+            }
+          });
+          
+          await Promise.all(anchorPromises);
           drawFrame(0);
           clearTimeout(timeoutId);
           setIsLoading(false);
+          
+          // 2. Lazy load the remaining frames in the background (batching of 5 in parallel to prevent congestion)
+          const lazyLoadRemaining = async () => {
+            const batchSize = 5;
+            const remainingIndices: number[] = [];
+            for (let i = 0; i < totalFrames; i++) {
+              if (!anchors.includes(i)) {
+                remainingIndices.push(i);
+              }
+            }
+            
+            for (let i = 0; i < remainingIndices.length; i += batchSize) {
+              const batch = remainingIndices.slice(i, i + batchSize);
+              await Promise.all(
+                batch.map(async (idx) => {
+                  try {
+                    const img = await loadSingleFrameWithRetry(idx + 1);
+                    framesRef.current[idx] = img;
+                  } catch (err) {
+                    // Fail silently for background lazy loads
+                  }
+                })
+              );
+              // Yield main thread to prevent UI freezing
+              await new Promise(resolve => setTimeout(resolve, 30));
+            }
+          };
+          
+          // Run lazy load in background
+          setTimeout(lazyLoadRemaining, 1000);
           return;
         }
 
@@ -772,7 +856,7 @@ export default function App() {
                 visibility: idx === 0 ? 'visible' : 'hidden',
                 pointerEvents: idx === 0 ? 'auto' : 'none',
               }}
-              className={`absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden transition-opacity duration-[100ms] ease-out ${isMobile && idx !== 0 ? 'bg-black' : 'bg-transparent'}`}
+              className={`absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden transition-opacity duration-[100ms] ease-out bg-transparent`}
             >
               <StorySection 
                 section={section} 
@@ -791,18 +875,24 @@ export default function App() {
               visibility: 'hidden',
               pointerEvents: 'none',
             }}
-            className={`absolute inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden transition-opacity duration-[100ms] ease-out ${isMobile ? 'bg-black' : 'bg-transparent'}`}
+            className={`absolute inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden transition-opacity duration-[100ms] ease-out bg-transparent`}
           >
             {isMobile ? (
-              /* Mobile Portrait Layout for Final Section */
-              <div className="w-full h-full flex flex-col justify-between px-8 py-[12vh] text-left select-none">
-                <div className="w-full max-w-[500px]">
-                  <h1 className="font-display text-[32px] sm:text-4xl font-medium text-[#F5F5F7] tracking-[-0.025em] leading-[1.1]">
+              /* Mobile Portrait Layout for Final Section: structured vertical flow */
+              <div className="w-full h-full flex flex-col justify-between px-6 pt-[10vh] pb-[8vh] text-left select-none box-border">
+                {/* Title */}
+                <div className="w-full">
+                  <h1 className="font-display text-[36px] xs:text-[40px] sm:text-[44px] font-bold text-white leading-[1.1] max-w-[500px]">
                     Launching Soon
                   </h1>
                 </div>
-                <div className="w-full max-w-[500px] mt-auto flex flex-col gap-2">
-                  <h2 className="font-sans text-xl text-[#F5F5F7] font-medium tracking-tight leading-[1.4]">
+                
+                {/* Middle Animation Spacer */}
+                <div className="flex-1 min-h-[200px] max-h-[35vh] w-full" />
+                
+                {/* Subtext */}
+                <div className="w-full mt-auto flex flex-col gap-2 max-w-[500px]">
+                  <h2 className="font-sans text-xl text-white font-bold tracking-tight leading-[1.4]">
                     One App. Every Charger
                   </h2>
                   <p className="font-sans text-base text-[#A1A1AA] font-normal leading-[1.6]">
@@ -859,15 +949,17 @@ export default function App() {
 
       {/* CONTACT BUTTON - Only persistent UI element */}
       {!isLoading && (
-        <div className="fixed bottom-[32px] right-[32px] z-40 pointer-events-auto">
+        <div className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-40 pointer-events-auto">
           {isContactOpen ? (
             <div
-              className="flex items-center gap-3 px-6 py-3 bg-[#000000]/40 border border-white/[0.06] rounded-full text-white/20 text-xs font-medium tracking-widest uppercase select-none pointer-events-none transition-all duration-300"
+              className={`flex items-center justify-center bg-[#000000]/40 border border-white/[0.06] rounded-full text-white/20 select-none pointer-events-none transition-all duration-300 ${
+                isMobile ? 'w-12 h-12' : 'gap-3 px-6 py-3 text-xs font-medium tracking-widest uppercase'
+              }`}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
               </svg>
-              <span className="font-sans font-medium">Contact Us</span>
+              {!isMobile && <span className="font-sans font-medium">Contact Us</span>}
             </div>
           ) : (
             <motion.button
@@ -878,13 +970,16 @@ export default function App() {
               whileTap={{ scale: 0.98 }}
               animate={{ opacity: activeId === 'final-section' ? 0.3 : 1.0 }}
               transition={{ type: 'spring', damping: 26, stiffness: 170 }}
-              className="flex items-center gap-3 px-6 py-3 bg-[#000000] hover:bg-[#121212] border border-white/[0.18] hover:border-white/40 rounded-full text-white text-xs font-medium tracking-widest uppercase shadow-sm hover:shadow-md cursor-pointer"
+              className={`flex items-center justify-center bg-[#000000] hover:bg-[#121212] border border-white/[0.18] hover:border-white/40 rounded-full text-white shadow-sm hover:shadow-md cursor-pointer ${
+                isMobile ? 'w-12 h-12' : 'gap-3 px-6 py-3 text-xs font-medium tracking-widest uppercase'
+              }`}
+              aria-label="Contact Us"
               title="Contact Us"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
               </svg>
-              <span className="text-white font-sans font-medium">Contact Us</span>
+              {!isMobile && <span className="text-white font-sans font-medium">Contact Us</span>}
             </motion.button>
           )}
         </div>

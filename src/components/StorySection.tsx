@@ -22,15 +22,21 @@ export default function StorySection({ section, index, opacity, isMobile = false
       className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden"
     >
       {isMobile ? (
-        /* Mobile Layout: clean, left-aligned flex container that prevents cropping/overflow */
-        <div className="w-full h-full flex flex-col justify-between px-8 py-[12vh] text-left select-none">
-          <div className="w-full max-w-[500px]">
-            <h2 className="font-display text-[32px] sm:text-4xl font-medium text-[#F5F5F7] tracking-[-0.025em] leading-[1.1]">
+        /* Mobile Portrait Layout: structured vertical flow with top title, middle animation spacer, and bottom subtext */
+        <div className="w-full h-full flex flex-col justify-between px-6 pt-[10vh] pb-[8vh] text-left select-none box-border">
+          {/* Hero Title */}
+          <div className="w-full">
+            <h2 className="font-display text-[36px] xs:text-[40px] sm:text-[44px] font-bold text-white tracking-[-0.025em] leading-[1.1] max-w-[500px]">
               {section.heading}
             </h2>
           </div>
-          <div className="w-full max-w-[500px] mt-auto">
-            <div className="font-sans text-base text-[#A1A1AA] font-normal leading-[1.6]">
+          
+          {/* Middle Spacer for Horizontally/Vertically Centered Scroll Animation (Canvas) */}
+          <div className="flex-1 min-h-[200px] max-h-[35vh] w-full" />
+          
+          {/* Subtitle / Supporting text */}
+          <div className="w-full mt-auto">
+            <div className="font-sans text-base sm:text-lg text-[#A1A1AA] font-normal leading-[1.6] max-w-[500px]">
               {Array.isArray(section.body) ? (
                 section.body.map((paragraph, idx) => (
                   <p key={idx} className={idx > 0 ? "mt-2" : ""}>{paragraph}</p>
