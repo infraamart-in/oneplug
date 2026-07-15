@@ -850,13 +850,7 @@ export default function App() {
                       : 'w-1.5 md:w-2 h-1.5 md:h-2 bg-white/20 hover:bg-white/60 scale-100'
                   }`}
                   aria-label={`Go to ${item.label}`}
-                  title={item.label}
                 />
-                
-                {/* Luxury Minimalist Text Tooltip (Hidden on mobile) */}
-                <span className="hidden md:inline absolute left-6 font-sans font-medium text-[9px] uppercase tracking-[0.2em] text-white/0 group-hover:text-white/60 transition-all duration-300 pointer-events-none whitespace-nowrap bg-black/80 backdrop-blur-sm px-2 py-1 rounded border border-white/10 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0">
-                  {item.label}
-                </span>
               </div>
             );
           })}
