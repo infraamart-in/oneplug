@@ -1,24 +1,1391 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OnePlug — India's Premium EV Charging Super App</title>
-  <meta name="description" content="We are building the operating layer for EV charging in India. Discover, navigate, and pay across Tata Power, Zeon, Statiq, Jio-bp and every other network through a single, unified interface.">
-  
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="description" content="Reeflux — One App. Every Charger. Powering the future of EV charging.">
+    <title>Reeflux — One App. Every Charger</title>
+
+    <!-- Preload Critical Logo Asset -->
+    <link rel="preload" as="image" href="./reeflux-logo-transparent.png" type="image/png">
+
+    <!-- Fonts & Design Tokens -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg-color: #050505;
+            --text-main: #F5F5F7;
+            --text-muted: #A1A1AA;
+            --silver-bright: #e0e4ed;
+            --silver-accent: rgba(224, 228, 237, 0.15);
+            --font-head: 'Outfit', -apple-system, system-ui, sans-serif;
+            --font-body: 'Inter', -apple-system, system-ui, sans-serif;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            max-width: 100vw;
+            background: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-body);
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* ================================================================
+           PREMIUM CINEMATIC REEFLUX PRELOADER
+        ================================================================ */
+        .preloader-overlay {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #050505;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            opacity: 1;
+            transition: opacity 750ms cubic-bezier(0.16, 1, 0.3, 1);
+            will-change: opacity;
+        }
+
+        .preloader-overlay.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .preloader-overlay.hidden {
+            display: none;
+        }
+
+        .preloader-ambient-glow {
+            position: absolute;
+            width: clamp(280px, 35vw, 550px);
+            height: clamp(280px, 35vw, 550px);
+            border-radius: 50%;
+            background: radial-gradient(
+                circle at center,
+                rgba(255, 255, 255, 0.05) 0%,
+                rgba(255, 255, 255, 0.02) 40%,
+                rgba(5, 5, 5, 0) 70%
+            );
+            filter: blur(60px);
+            pointer-events: none;
+            animation: preloaderGlowBreathe 2.8s infinite ease-in-out;
+            will-change: transform, opacity;
+        }
+
+        .preloader-logo {
+            position: relative;
+            z-index: 2;
+            width: clamp(180px, 20vw, 320px);
+            max-width: 75vw;
+            height: auto;
+            aspect-ratio: 878 / 240;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F2F2F2 30%, #E6E6E6 65%, #CFCFCF 100%);
+            -webkit-mask-image: url('./reeflux-logo-transparent.png');
+            mask-image: url('./reeflux-logo-transparent.png');
+            -webkit-mask-size: contain;
+            mask-size: contain;
+            -webkit-mask-repeat: no-repeat;
+            mask-repeat: no-repeat;
+            -webkit-mask-position: center;
+            mask-position: center;
+            filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.25));
+            animation: preloaderLogoBreathe 2.8s infinite ease-in-out;
+            will-change: transform, opacity, filter;
+        }
+
+        .preloader-logo.still {
+            animation-play-state: paused;
+        }
+
+        .preloader-ambient-glow.still {
+            animation-play-state: paused;
+        }
+
+        @keyframes preloaderLogoBreathe {
+            0%, 100% {
+                transform: scale(1.00);
+                opacity: 0.92;
+                filter: brightness(1.00);
+            }
+            50% {
+                transform: scale(1.04);
+                opacity: 1.00;
+                filter: brightness(1.07);
+            }
+        }
+
+        @keyframes preloaderGlowBreathe {
+            0%, 100% {
+                transform: scale(0.95);
+                opacity: 0.70;
+            }
+            50% {
+                transform: scale(1.08);
+                opacity: 1.00;
+            }
+        }
+
+        /* --- GPU WebGL Canvas Background --- */
+        canvas#c {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            top: 0; left: 0;
+            z-index: 1;
+            touch-action: none;
+            cursor: default;
+        }
+
+        /* --- UI Overlay Layer Deck --- */
+        .ui-viewport-deck {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        /* ================================================================
+           MINIMALIST VERTICAL SECTION PROGRESS INDICATOR (DOTS ONLY)
+        ================================================================ */
+        .section-indicator-dots {
+            position: fixed;
+            left: 2.2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 35;
+            display: flex;
+            flex-direction: column;
+            gap: 1.1rem;
+            pointer-events: auto;
+        }
+
+        .nav-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.22);
+            border: none;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 0 0px transparent;
+        }
+
+        .nav-dot:hover, .nav-dot:focus-visible {
+            background: rgba(255, 255, 255, 0.55);
+            transform: scale(1.2);
+            outline: 2px solid rgba(255, 255, 255, 0.4);
+            outline-offset: 3px;
+        }
+
+        .nav-dot.active {
+            width: 9px;
+            height: 9px;
+            background: #ffffff;
+            transform: scale(1.15);
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.75), 0 0 4px rgba(255, 255, 255, 0.9);
+        }
+
+        /* ================================================================
+           ULTRA-SUBTLE ATMOSPHERIC DIFFUSION SYSTEM
+        ================================================================ */
+        .spotlight {
+            position: relative;
+            isolation: isolate;
+        }
+
+        .spotlight::before {
+            content: '';
+            position: absolute;
+            z-index: -1;
+            pointer-events: none;
+            background: radial-gradient(
+                ellipse at center,
+                rgba(5, 5, 5, 0.30) 0%,
+                rgba(5, 5, 5, 0.16) 45%,
+                rgba(5, 5, 5, 0.04) 75%,
+                rgba(5, 5, 5, 0) 100%
+            );
+            opacity: 0;
+            transform: scale(0.95);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+                        transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .spotlight.active::before {
+            opacity: 0.85;
+            transform: scale(1);
+        }
+
+        .spotlight-heading::before {
+            inset: -6rem -12rem;
+            border-radius: 50%;
+            filter: blur(80px);
+        }
+
+        .spotlight-paragraph::before {
+            inset: -4rem -8rem;
+            border-radius: 50px;
+            filter: blur(64px);
+        }
+
+        .spotlight-logo::before {
+            inset: -7rem -14rem;
+            border-radius: 50%;
+            filter: blur(90px);
+        }
+
+        .spotlight-pill::before {
+            inset: -2rem -3.5rem;
+            border-radius: 100px;
+            filter: blur(40px);
+        }
+
+        /* ================================================================
+           REEFLUX STORYTELLING SECTIONS — 100% CENTER ALIGNED
+        ================================================================ */
+        .story-section {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            opacity: 0;
+            filter: blur(6px);
+            pointer-events: none;
+            transition: opacity 380ms ease-in-out, filter 380ms ease-in-out;
+            overflow: hidden;
+            will-change: opacity, filter;
+        }
+
+        .story-section.active {
+            opacity: 1;
+            filter: blur(0px);
+            pointer-events: auto;
+        }
+
+        .section-content {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 1.5rem;
+            transition: transform 380ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .section-content.left,
+        .section-content.right,
+        .section-content.center {
+            align-items: center;
+            text-align: center;
+        }
+
+        /* ================================================================
+           MATTE TITANIUM / BRUSHED ALUMINUM METALLIC TYPOGRAPHY
+        ================================================================ */
+        .section-heading {
+            font-family: var(--font-head);
+            font-size: clamp(2.2rem, 5.5vw, 4.5rem);
+            font-weight: 500;
+            letter-spacing: -0.03em;
+            line-height: 0.98;
+            max-width: 850px;
+            white-space: pre-line;
+            text-align: center;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F2F2F2 30%, #E6E6E6 65%, #CFCFCF 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 1px 1px rgba(255, 255, 255, 0.22));
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s,
+                        transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s;
+        }
+
+        .story-section.active .section-heading {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .section-body {
+            font-family: var(--font-body);
+            font-size: clamp(1rem, 1.8vw, 1.25rem);
+            font-weight: 400;
+            line-height: 1.6;
+            color: var(--text-muted);
+            max-width: 620px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 0.6rem;
+        }
+
+        .body-paragraph {
+            text-align: center;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+                        transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .story-section.active .body-paragraph {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .body-paragraph.highlight {
+            font-size: clamp(1.4rem, 2.5vw, 1.8rem);
+            font-weight: 500;
+            color: #F5F5F7;
+            letter-spacing: -0.02em;
+            line-height: 1.18;
+            margin-bottom: 0.25rem;
+            text-align: center;
+        }
+
+        /* Ambient Glow Backdrop */
+        .ambient-glow {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 380ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .ambient-glow-circle {
+            width: clamp(350px, 60vw, 900px);
+            height: clamp(350px, 60vw, 900px);
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.01) 40%, transparent 70%);
+            filter: blur(48px);
+            opacity: 0.6;
+        }
+
+        /* ================================================================
+           HERO REEFLUX BRAND COMPOSITION (MATTE TITANIUM LOGO)
+        ================================================================ */
+        .launching-soon-tag {
+            font-family: var(--font-body);
+            font-size: clamp(0.72rem, 1.1vw, 0.88rem);
+            font-weight: 500;
+            letter-spacing: 0.32em;
+            text-transform: uppercase;
+            color: rgba(245, 245, 247, 0.70);
+            margin-bottom: 0.5rem;
+            opacity: 0;
+            transform: translateY(16px);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+                        transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .story-section.active .launching-soon-tag {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .reeflux-image-logo {
+            width: clamp(200px, 35vw, 530px);
+            height: auto;
+            aspect-ratio: 878 / 240;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F2F2F2 30%, #E6E6E6 65%, #CFCFCF 100%);
+            -webkit-mask-image: url('./reeflux-logo-transparent.png');
+            mask-image: url('./reeflux-logo-transparent.png');
+            -webkit-mask-size: contain;
+            mask-size: contain;
+            -webkit-mask-repeat: no-repeat;
+            mask-repeat: no-repeat;
+            -webkit-mask-position: center;
+            mask-position: center;
+            filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.25)) drop-shadow(0 0 20px rgba(255, 255, 255, 0.12));
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s,
+                        transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s;
+        }
+
+        .story-section.active .reeflux-image-logo {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ================================================================
+           FLOATING SCROLL CHEVRON
+        ================================================================ */
+        .scroll-chevron {
+            position: absolute;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.4rem;
+            pointer-events: none;
+            z-index: 20;
+            opacity: 0;
+            transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+
+        .scroll-chevron.visible {
+            opacity: 1;
+        }
+
+        .scroll-chevron-label {
+            font-size: 0.62rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.5);
+            font-weight: 500;
+        }
+
+        .scroll-chevron-icon {
+            width: 16px;
+            height: 16px;
+            stroke: rgba(255, 255, 255, 0.6);
+            stroke-width: 1.8;
+            animation: bounceChevron 2.2s infinite ease-in-out;
+        }
+
+        @keyframes bounceChevron {
+            0%, 100% { transform: translateY(0); opacity: 0.4; }
+            50% { transform: translateY(6px); opacity: 0.85; }
+        }
+
+        /* ================================================================
+           FIXED BOTTOM-RIGHT CONTACT US BUTTON & GLASS MODAL
+        ================================================================ */
+        .contact-btn-wrapper {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 40;
+            pointer-events: auto;
+        }
+
+        .contact-btn {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.65rem;
+            padding: 0.8rem 1.6rem;
+            border-radius: 100px;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            background: rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            color: #F5F5F7;
+            font-family: var(--font-body);
+            font-size: 0.78rem;
+            font-weight: 500;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.38), inset 0 1px 1px rgba(255, 255, 255, 0.22);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+        }
+
+        .contact-btn:hover, .contact-btn:focus-visible {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.28);
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.48), inset 0 1px 1px rgba(255, 255, 255, 0.32);
+            color: #ffffff;
+            outline: none;
+        }
+
+        .contact-btn.open {
+            background: rgba(255, 255, 255, 0.14);
+            border-color: rgba(255, 255, 255, 0.32);
+        }
+
+        .contact-btn-icon {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+            stroke-width: 2.2;
+            flex-shrink: 0;
+        }
+
+        /* Glass Modal Cards Popup */
+        .contact-modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 35;
+            background: transparent;
+            cursor: default;
+            display: none;
+        }
+
+        .contact-modal-overlay.open {
+            display: block;
+        }
+
+        .contact-cards-container {
+            position: fixed;
+            bottom: 5.5rem;
+            right: 2rem;
+            z-index: 40;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            width: calc(100vw - 4rem);
+            max-width: 320px;
+            pointer-events: auto;
+            opacity: 0;
+            transform: translateY(12px);
+            transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                        transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: none;
+        }
+
+        .contact-cards-container.open {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .glass-card {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            padding: 1rem 1.25rem;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.38), inset 0 1px 1px rgba(255, 255, 255, 0.22);
+            text-decoration: none;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+        }
+
+        .glass-card:hover, .glass-card:focus-visible {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.28);
+            transform: translateY(-3px);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.48), inset 0 1px 1px rgba(255, 255, 255, 0.32);
+            outline: none;
+        }
+
+        .glass-card-label {
+            font-size: 0.62rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.5);
+            font-weight: 500;
+        }
+
+        .glass-card-value {
+            font-size: 0.88rem;
+            color: #F5F5F7;
+            font-weight: 400;
+            letter-spacing: -0.01em;
+            transition: color 0.2s ease;
+        }
+
+        .glass-card:hover .glass-card-value {
+            color: #ffffff;
+        }
+
+        /* Responsive Mobile & Tablet Layout adjustments */
+        @media (max-width: 768px) {
+            .section-indicator-dots { left: 1rem; gap: 0.85rem; }
+            .contact-btn span { display: none; }
+            .contact-btn { padding: 0.85rem; border-radius: 50%; width: 48px; height: 48px; }
+            .contact-cards-container { right: 1rem; width: calc(100vw - 2rem); bottom: 5rem; }
+            .story-section { padding: 1.25rem 1rem; }
+        }
+
+        @media (max-width: 480px) {
+            .section-heading { font-size: clamp(1.8rem, 7.5vw, 2.6rem); }
+            .section-body { font-size: clamp(0.92rem, 4vw, 1.1rem); }
+            .body-paragraph.highlight { font-size: clamp(1.2rem, 5vw, 1.5rem); }
+        }
+    </style>
 </head>
 <body>
-  <!-- Visually hidden main heading for SEO indexing -->
-  <h1 class="sr-only">OnePlug EV Charging Super App</h1>
 
-  <!-- React root mount point -->
-  <div id="root"></div>
+<!-- Premium Cinematic Reeflux Preloader Layer (Matte Black #050505) -->
+<div class="preloader-overlay" id="preloader" role="dialog" aria-label="Loading Reeflux">
+    <div class="preloader-ambient-glow"></div>
+    <div class="preloader-logo" role="img" aria-label="Reeflux"></div>
+</div>
 
-  <!-- Vite entry script module -->
-  <script type="module" src="/src/main.tsx"></script>
+<!-- GPU WebGL Background Canvas (Preserved Exactly as Finalized) -->
+<canvas id="c"></canvas>
+
+<!-- Minimalist Vertical Section Progress Indicator (Dots Only) -->
+<nav class="section-indicator-dots" id="indicator-dots" aria-label="Section navigation"></nav>
+
+<!-- Viewport Deck Layer for Reeflux Storytelling Content -->
+<main class="ui-viewport-deck" id="viewport-deck" role="main">
+
+    <!-- Section 01 -->
+    <section class="story-section active" id="section-0" aria-label="Effortless Charging">
+        <div class="ambient-glow"><div class="ambient-glow-circle"></div></div>
+        <div class="section-content center spotlight spotlight-heading">
+            <h1 class="section-heading">Charging shouldn't be complicated</h1>
+            <div class="section-body spotlight spotlight-paragraph">
+                <p class="body-paragraph">Owning an EV should feel effortless.</p>
+            </div>
+        </div>
+        <div class="scroll-chevron"><span class="scroll-chevron-label">Scroll</span><svg class="scroll-chevron-icon" viewBox="0 0 24 24" fill="none"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </section>
+
+    <!-- Section 02 -->
+    <section class="story-section" id="section-1" aria-label="Fragmentation Challenge">
+        <div class="ambient-glow"><div class="ambient-glow-circle"></div></div>
+        <div class="section-content center spotlight spotlight-heading">
+            <h2 class="section-heading">One car. Five apps.
+Why?</h2>
+            <div class="section-body spotlight spotlight-paragraph">
+                <p class="body-paragraph">Every charging network has its own app.</p>
+                <p class="body-paragraph">Every payment works differently.</p>
+                <p class="body-paragraph">Charging shouldn't feel this complicated.</p>
+            </div>
+        </div>
+        <div class="scroll-chevron"><span class="scroll-chevron-label">Scroll</span><svg class="scroll-chevron-icon" viewBox="0 0 24 24" fill="none"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </section>
+
+    <!-- Section 03 -->
+    <section class="story-section" id="section-2" aria-label="Unified Payment Solution">
+        <div class="ambient-glow"><div class="ambient-glow-circle"></div></div>
+        <div class="section-content center spotlight spotlight-heading">
+            <h2 class="section-heading">One Map. One Payment</h2>
+            <div class="section-body spotlight spotlight-paragraph">
+                <p class="body-paragraph">Find charging stations across multiple EV charging networks and pay seamlessly without switching between different apps or wallets.</p>
+            </div>
+        </div>
+        <div class="scroll-chevron"><span class="scroll-chevron-label">Scroll</span><svg class="scroll-chevron-icon" viewBox="0 0 24 24" fill="none"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </section>
+
+    <!-- Section 04 -->
+    <section class="story-section" id="section-3" aria-label="Driver-centric Design">
+        <div class="ambient-glow"><div class="ambient-glow-circle"></div></div>
+        <div class="section-content center spotlight spotlight-heading">
+            <h2 class="section-heading">Designed around drivers</h2>
+            <div class="section-body spotlight spotlight-paragraph">
+                <p class="body-paragraph">Locate. Navigate. Charge. Pay. Everything in one experience.</p>
+            </div>
+        </div>
+        <div class="scroll-chevron"><span class="scroll-chevron-label">Scroll</span><svg class="scroll-chevron-icon" viewBox="0 0 24 24" fill="none"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </section>
+
+    <!-- Section 05 (Official Reeflux Brand Hero Reveal) -->
+    <section class="story-section" id="section-4" aria-label="Reeflux Brand Reveal">
+        <div class="ambient-glow"><div class="ambient-glow-circle"></div></div>
+        <div class="section-content center spotlight spotlight-logo" style="gap: 1.8rem;">
+            <span class="launching-soon-tag">LAUNCHING SOON</span>
+            <div class="reeflux-image-logo" role="img" aria-label="Reeflux"></div>
+            <div class="section-body spotlight spotlight-paragraph">
+                <p class="body-paragraph highlight">One App. Every Charger</p>
+                <p class="body-paragraph">Powering the future of EV charging.</p>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<!-- Floating Contact Us Glass Button & Popup Panel -->
+<div class="contact-modal-overlay" id="contact-overlay" aria-hidden="true"></div>
+<div class="contact-cards-container" id="contact-cards" role="dialog" aria-label="Contact options" aria-hidden="true">
+    <a href="mailto:reeflux.charge@gmail.com" class="glass-card spotlight spotlight-pill">
+        <span class="glass-card-label">EMAIL</span>
+        <span class="glass-card-value">reeflux.charge@gmail.com</span>
+    </a>
+    <a href="https://instagram.com/reeflux.charge" target="_blank" rel="noopener noreferrer" class="glass-card spotlight spotlight-pill">
+        <span class="glass-card-label">INSTAGRAM</span>
+        <span class="glass-card-value">@reeflux.charge</span>
+    </a>
+</div>
+
+<div class="contact-btn-wrapper">
+    <button class="contact-btn spotlight spotlight-pill" id="contact-btn" aria-label="Contact Us" aria-haspopup="dialog" aria-expanded="false">
+        <svg class="contact-btn-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path id="contact-btn-path" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Contact Us</span>
+    </button>
+</div>
+
+<!-- Navigation Controller & WebGL2 Pipeline -->
+<script>
+(() => {
+    'use strict';
+
+    /* ================================================================
+       1. PRELOADER CONTROLLER & DUAL-CONDITION DISMISSAL
+    ================================================================ */
+    const preloader = document.getElementById('preloader');
+    const preloaderLogo = preloader.querySelector('.preloader-logo');
+    const preloaderGlow = preloader.querySelector('.preloader-ambient-glow');
+
+    let minDurationElapsed = false;
+    let pageFullyLoaded = false;
+    let preloaderDismissed = false;
+
+    const MIN_PRELOADER_TIME = 3500; // 3.5s minimum display duration
+
+    function checkAndDismissPreloader() {
+        if (minDurationElapsed && pageFullyLoaded && !preloaderDismissed) {
+            preloaderDismissed = true;
+
+            // Hold logo still naturally for 200ms
+            preloaderLogo.classList.add('still');
+            preloaderGlow.classList.add('still');
+
+            setTimeout(() => {
+                // Smoothly fade preloader out over 750ms revealing running GPU contour background underneath
+                preloader.classList.add('fade-out');
+
+                setTimeout(() => {
+                    preloader.classList.add('hidden');
+                }, 750);
+            }, 200);
+        }
+    }
+
+    // Timer for Minimum 3.5s display duration
+    setTimeout(() => {
+        minDurationElapsed = true;
+        checkAndDismissPreloader();
+    }, MIN_PRELOADER_TIME);
+
+    // Window Load Event for Complete Asset & Shader Initialization
+    window.addEventListener('load', () => {
+        pageFullyLoaded = true;
+        checkAndDismissPreloader();
+    });
+
+    if (document.readyState === 'complete') {
+        pageFullyLoaded = true;
+        checkAndDismissPreloader();
+    }
+
+    /* ================================================================
+       2. REEFLUX NAVIGATION & SECTION PROGRESS CONTROLLER
+    ================================================================ */
+    const sectionsCount = 5;
+    let activeIndex = 0;
+    let isLocked = false;
+
+    const sections = Array.from({ length: sectionsCount }, (_, idx) => document.getElementById(`section-${idx}`));
+    const indicatorDotsContainer = document.getElementById('indicator-dots');
+    const navDots = [];
+
+    // Build Left Minimal Dots
+    for (let i = 0; i < sectionsCount; i++) {
+        const btn = document.createElement('button');
+        btn.className = `nav-dot ${i === 0 ? 'active' : ''}`;
+        btn.setAttribute('aria-label', `Go to section ${i + 1}`);
+        btn.addEventListener('click', () => goToSection(i));
+        indicatorDotsContainer.appendChild(btn);
+        navDots.push(btn);
+    }
+
+    function updateActiveSection(nextIndex) {
+        if (nextIndex === activeIndex) return;
+
+        const prevIndex = activeIndex;
+        activeIndex = nextIndex;
+
+        // Lock navigation during transition
+        isLocked = true;
+
+        // Trigger subtle tactile feedback for mobile devices
+        if ('vibrate' in navigator) {
+            try { navigator.vibrate(12); } catch (_) {}
+        }
+
+        // Update section and dot active states smoothly
+        sections[prevIndex].classList.remove('active');
+        navDots[prevIndex].classList.remove('active');
+
+        // Deactivate spotlights on previous section
+        sections[prevIndex].querySelectorAll('.spotlight').forEach(el => el.classList.remove('active'));
+
+        setTimeout(() => {
+            sections[activeIndex].classList.add('active');
+            navDots[activeIndex].classList.add('active');
+
+            // Activate spotlights on new section
+            sections[activeIndex].querySelectorAll('.spotlight').forEach(el => el.classList.add('active'));
+
+            setTimeout(() => {
+                isLocked = false;
+            }, 450);
+        }, 320);
+    }
+
+    function goToSection(targetIdx) {
+        const nextIdx = Math.min(Math.max(targetIdx, 0), sectionsCount - 1);
+        if (nextIdx !== activeIndex && !isLocked) {
+            updateActiveSection(nextIdx);
+        }
+    }
+
+    // Activate initial section spotlights
+    setTimeout(() => {
+        sections[0].querySelectorAll('.spotlight').forEach(el => el.classList.add('active'));
+    }, 200);
+
+    // Scroll Chevron Timer (shows after 3s of idle time per section)
+    let chevronTimer = null;
+    function resetChevronTimer() {
+        sections.forEach(s => {
+            const chev = s.querySelector('.scroll-chevron');
+            if (chev) chev.classList.remove('visible');
+        });
+
+        if (chevronTimer) clearTimeout(chevronTimer);
+
+        chevronTimer = setTimeout(() => {
+            if (activeIndex < sectionsCount - 1) {
+                const currentChev = sections[activeIndex].querySelector('.scroll-chevron');
+                if (currentChev) currentChev.classList.add('visible');
+            }
+        }, 3000);
+    }
+    resetChevronTimer();
+
+    // Wheel Scroll Interception
+    window.addEventListener('wheel', (e) => {
+        if (e.cancelable) e.preventDefault();
+
+        if (Math.abs(e.deltaY) < 10 || isLocked) return;
+
+        resetChevronTimer();
+
+        if (e.deltaY > 0) {
+            if (activeIndex < sectionsCount - 1) {
+                goToSection(activeIndex + 1);
+            }
+        } else if (e.deltaY < 0) {
+            if (activeIndex > 0) {
+                goToSection(activeIndex - 1);
+            }
+        }
+    }, { passive: false });
+
+    // Touch Swipe Interception for Mobile / Trackpad
+    let touchStartY = 0;
+    let touchStartX = 0;
+
+    window.addEventListener('touchstart', (e) => {
+        if (e.touches.length > 0) {
+            touchStartY = e.touches[0].clientY;
+            touchStartX = e.touches[0].clientX;
+        }
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+        if (e.cancelable) e.preventDefault();
+    }, { passive: false });
+
+    window.addEventListener('touchend', (e) => {
+        if (e.changedTouches.length === 0 || isLocked) return;
+
+        const touchEndY = e.changedTouches[0].clientY;
+        const touchEndX = e.changedTouches[0].clientX;
+        const deltaY = touchEndY - touchStartY;
+        const deltaX = touchEndX - touchStartX;
+
+        if (Math.abs(deltaY) < 30 || Math.abs(deltaY) < Math.abs(deltaX)) return;
+
+        resetChevronTimer();
+
+        if (deltaY < 0) {
+            if (activeIndex < sectionsCount - 1) {
+                goToSection(activeIndex + 1);
+            }
+        } else {
+            if (activeIndex > 0) {
+                goToSection(activeIndex - 1);
+            }
+        }
+    }, { passive: true });
+
+    // Keyboard Arrow / Page Navigation
+    window.addEventListener('keydown', (e) => {
+        if (isLocked) return;
+
+        if (e.key === 'ArrowDown' || e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) {
+            e.preventDefault();
+            resetChevronTimer();
+            if (activeIndex < sectionsCount - 1) goToSection(activeIndex + 1);
+        } else if (e.key === 'ArrowUp' || e.key === 'PageUp' || (e.key === ' ' && e.shiftKey)) {
+            e.preventDefault();
+            resetChevronTimer();
+            if (activeIndex > 0) goToSection(activeIndex - 1);
+        } else if (e.key === 'Escape') {
+            closeContactModal();
+        }
+    });
+
+    /* ================================================================
+       3. FLOATING CONTACT US MODAL CONTROLLER
+    ================================================================ */
+    const contactBtn = document.getElementById('contact-btn');
+    const contactBtnPath = document.getElementById('contact-btn-path');
+    const contactOverlay = document.getElementById('contact-overlay');
+    const contactCards = document.getElementById('contact-cards');
+    let isContactOpen = false;
+
+    function toggleContactModal() {
+        isContactOpen = !isContactOpen;
+        if (isContactOpen) {
+            contactBtn.classList.add('open');
+            contactBtn.setAttribute('aria-expanded', 'true');
+            contactOverlay.classList.add('open');
+            contactOverlay.setAttribute('aria-hidden', 'false');
+            contactCards.classList.add('open');
+            contactCards.setAttribute('aria-hidden', 'false');
+            contactBtnPath.setAttribute('d', 'M18 6L6 18M6 6l12 12');
+            contactCards.querySelectorAll('.spotlight').forEach(el => el.classList.add('active'));
+        } else {
+            closeContactModal();
+        }
+    }
+
+    function closeContactModal() {
+        isContactOpen = false;
+        contactBtn.classList.remove('open');
+        contactBtn.setAttribute('aria-expanded', 'false');
+        contactOverlay.classList.remove('open');
+        contactOverlay.setAttribute('aria-hidden', 'true');
+        contactCards.classList.remove('open');
+        contactCards.setAttribute('aria-hidden', 'true');
+        contactBtnPath.setAttribute('d', 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z');
+        contactCards.querySelectorAll('.spotlight').forEach(el => el.classList.remove('active'));
+    }
+
+    contactBtn.addEventListener('click', toggleContactModal);
+    contactOverlay.addEventListener('click', closeContactModal);
+
+    /* ================================================================
+       4. PRESERVED WEBGL2 SHADER PIPELINE & INTERACTION ENGINE
+    ================================================================ */
+    const canvas = document.getElementById('c');
+    const gl = canvas.getContext('webgl2', {
+        antialias: false,
+        alpha: false,
+        depth: false,
+        stencil: false,
+        powerPreference: 'high-performance',
+        preserveDrawingBuffer: false
+    });
+
+    if (!gl) return;
+
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+        || ('ontouchstart' in window && navigator.maxTouchPoints > 1);
+
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const renderer = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : '';
+    const isWeakGPU = /Intel(?!.*Arc)|Iris|Mesa|llvmpipe|SwiftShader/i.test(renderer);
+
+    const maxDPR = isMobile ? 1.5 : (isWeakGPU ? 1.0 : 2.0);
+    const dpr = Math.min(window.devicePixelRatio || 1, maxDPR);
+    const OCTAVES = isMobile ? 3 : (isWeakGPU ? 4 : 5);
+    const MAX_CLICKS = 8;
+
+    const VERT_SRC = `#version 300 es
+    void main() {
+        float x = -1.0 + float((gl_VertexID & 1) << 2);
+        float y = -1.0 + float((gl_VertexID & 2) << 1);
+        gl_Position = vec4(x, y, 0.0, 1.0);
+    }`;
+
+    const FRAG_SRC = `#version 300 es
+    precision highp float;
+
+    uniform float u_time;
+    uniform vec2  u_resolution;
+    uniform vec2  u_mouse;
+    uniform float u_mousePresence;
+    uniform vec4  u_clicks[${MAX_CLICKS}];
+
+    out vec4 fragColor;
+
+    vec3 mod289v3(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+    vec4 mod289v4(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+    vec4 permute(vec4 x)  { return mod289v4(((x * 34.0) + 10.0) * x); }
+    vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+
+    float snoise(vec3 v) {
+        const vec2 C = vec2(1.0 / 6.0, 1.0 / 3.0);
+        const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+
+        vec3 i  = floor(v + dot(v, C.yyy));
+        vec3 x0 = v - i + dot(i, C.xxx);
+
+        vec3 g = step(x0.yzx, x0.xyz);
+        vec3 l = 1.0 - g;
+        vec3 i1 = min(g.xyz, l.zxy);
+        vec3 i2 = max(g.xyz, l.zxy);
+
+        vec3 x1 = x0 - i1 + C.xxx;
+        vec3 x2 = x0 - i2 + C.yyy;
+        vec3 x3 = x0 - D.yyy;
+
+        i = mod289v3(i);
+        vec4 p = permute(permute(permute(
+            i.z + vec4(0.0, i1.z, i2.z, 1.0))
+          + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+          + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+
+        float n_ = 0.142857142857;
+        vec3 ns = n_ * D.wyz - D.xzx;
+
+        vec4 j  = p - 49.0 * floor(p * ns.z * ns.z);
+        vec4 x_ = floor(j * ns.z);
+        vec4 y_ = floor(j - 7.0 * x_);
+
+        vec4 hx = x_ * ns.x + ns.yyyy;
+        vec4 hy = y_ * ns.x + ns.yyyy;
+        vec4 hz = 1.0 - abs(hx) - abs(hy);
+
+        vec4 b0 = vec4(hx.xy, hy.xy);
+        vec4 b1 = vec4(hx.zw, hy.zw);
+
+        vec4 s0 = floor(b0) * 2.0 + 1.0;
+        vec4 s1 = floor(b1) * 2.0 + 1.0;
+        vec4 sh = -step(hz, vec4(0.0));
+
+        vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+        vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+
+        vec3 p0 = vec3(a0.xy, hz.x);
+        vec3 p1 = vec3(a0.zw, hz.y);
+        vec3 p2 = vec3(a1.xy, hz.z);
+        vec3 p3 = vec3(a1.zw, hz.w);
+
+        vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+        p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+
+        vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+        m = m * m;
+        return 42.0 * dot(m * m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+    }
+
+    const mat3 FBM_ROT = mat3(
+         0.00,  0.80,  0.60,
+        -0.80,  0.36, -0.48,
+        -0.60, -0.48,  0.64
+    );
+
+    float fbm(vec3 p) {
+        float value = 0.0;
+        float amplitude = 0.5;
+        for (int i = 0; i < ${OCTAVES}; i++) {
+            value += amplitude * snoise(p);
+            p = FBM_ROT * p * 2.02 + vec3(1.7, 9.2, 4.1);
+            amplitude *= 0.48;
+        }
+        return value;
+    }
+
+    void main() {
+        vec2 uv = gl_FragCoord.xy / u_resolution;
+        float aspect = u_resolution.x / u_resolution.y;
+        vec2 pos = (uv - 0.5) * vec2(aspect, 1.0);
+
+        float t = u_time * 0.014;
+
+        /* --- Cursor Magnetic Wire Deformation --- */
+        vec2 mousePos = (u_mouse - 0.5) * vec2(aspect, 1.0);
+        vec2 toMouse = mousePos - pos;
+        float distToMouse = length(toMouse);
+
+        float cursorRadius = 0.16;
+        float mouseFalloff = exp(-(distToMouse * distToMouse) / (cursorRadius * cursorRadius));
+        mouseFalloff *= u_mousePresence;
+
+        vec2 magneticAttraction = toMouse * mouseFalloff * 0.08;
+        vec2 pWarped = pos + magneticAttraction;
+
+        /* --- Continuous Uniform Scalar Height Field H(pWarped, t) --- */
+        vec2 pBase = pWarped * 0.62;
+        float hField = fbm(vec3(pBase, t * 0.70));
+        hField += 0.26 * snoise(vec3(pBase * 2.1 + vec2(4.2, -2.1), t * 0.85));
+
+        /* --- Click Energy Surface Adaptation --- */
+        float clickReflectPulse = 0.0;
+        for (int i = 0; i < ${MAX_CLICKS}; i++) {
+            vec4 clk = u_clicks[i];
+            if (clk.z < 0.001) continue;
+
+            float age = u_time - clk.z;
+            if (age < 0.0 || age > 5.5) continue;
+
+            vec2 cPos = (clk.xy - 0.5) * vec2(aspect, 1.0);
+            float dist = length(pWarped - cPos);
+            float seed = clk.w;
+
+            float timeEnv = ((age * age) / (0.04 + age * age)) * exp(-age * 0.65);
+            float sigma = 0.15 + 0.25 * smoothstep(0.0, 2.5, age);
+            float spatialFalloff = exp(-(dist * dist) / (sigma * sigma));
+
+            vec3 seedVec = vec3(cos(seed), sin(seed), seed * 0.3);
+            float organicEnergy = snoise(vec3((pWarped - cPos) * 1.8 + seedVec.xy, t * 0.6 + seedVec.z));
+
+            float deltaH = spatialFalloff * timeEnv * 0.28 * organicEnergy;
+            hField += deltaH;
+            clickReflectPulse += spatialFalloff * timeEnv * 0.14;
+        }
+
+        /* --- Organic Density Masking --- */
+        float densityNoise = snoise(vec3(pWarped * 0.50 + vec2(1.2, -0.8), t * 0.3));
+        float fieldMask = smoothstep(-0.55, 0.35, densityNoise);
+
+        /* --- Soft Ribbon SDF Contour Isolines --- */
+        float nContour = 13.5;
+        float cf = hField * nContour;
+
+        vec2 gradCF = vec2(dFdx(cf), dFdy(cf));
+        float gradLenCF = length(gradCF) + 1e-6;
+        float distInPixels = abs(fract(cf + 0.5) - 0.5) / gradLenCF;
+
+        float thickMod = 1.0 + 0.18 * sin(cf * 6.28318 + snoise(vec3(pWarped * 2.5, t)));
+        float levelIndex = floor(cf + 0.5);
+        bool isMajor = mod(levelIndex, 2.0) < 1.0;
+
+        float ribbonSigma = isMajor ? (1.10 * thickMod) : (0.88 * thickMod);
+        float lineCore = exp(-(distInPixels * distInPixels) / (2.0 * ribbonSigma * ribbonSigma));
+
+        /* --- Brushed Metallic Lighting --- */
+        vec2 grad = vec2(dFdx(hField), dFdy(hField));
+        float gradLen = length(grad);
+
+        float normalScale = u_resolution.y * 0.35;
+        vec3 N = normalize(vec3(-grad * normalScale, 1.0));
+
+        vec2 tangent = gradLen > 1e-7
+            ? normalize(vec2(-grad.y, grad.x))
+            : vec2(0.707, 0.707);
+
+        vec2 keyLightDir = normalize(vec2(0.42, 0.65));
+        float keyAniso = pow(abs(dot(tangent, keyLightDir)), 2.2);
+
+        vec2 fillLightDir = normalize(vec2(-0.60, 0.30));
+        float fillAniso = pow(abs(dot(tangent, fillLightDir)), 2.8) * 0.35;
+
+        float fresnel = pow(1.0 - abs(dot(N, vec3(0.0, 0.0, 1.0))), 3.5);
+        float travelHighlight = snoise(vec3(tangent * 2.2 + pos * 0.6, t * 0.9)) * 0.12;
+
+        float metallicReflect = 0.28
+            + keyAniso   * 0.52
+            + fillAniso  * 0.22
+            + fresnel    * 0.18
+            + travelHighlight
+            + mouseFalloff * 0.10
+            + clickReflectPulse;
+
+        float illumination = 0.85 + snoise(vec3(pos * 0.4, t * 0.25)) * 0.15;
+
+        float lineIntensity = isMajor
+            ? (lineCore * metallicReflect * 0.88 * illumination * fieldMask)
+            : (lineCore * (metallicReflect * 0.75 + 0.15) * 0.42 * illumination * fieldMask);
+
+        /* --- Edge Vignette --- */
+        vec2 vc = (uv - 0.5) * vec2(1.35, 1.12);
+        float vignette = 1.0 - smoothstep(0.18, 0.88, dot(vc, vc));
+        lineIntensity *= vignette;
+
+        /* --- Composition --- */
+        float bgVal = mix(0.019, 0.028, uv.y * 0.4 + 0.3);
+        vec3 bg = vec3(bgVal, bgVal, bgVal + 0.0015);
+
+        vec3 silverColor = isMajor
+            ? vec3(0.88, 0.90, 0.94)
+            : vec3(0.65, 0.68, 0.72);
+
+        vec3 color = bg + silverColor * lineIntensity;
+
+        color *= 1.0 + sin(u_time * 0.12) * 0.018;
+        color *= smoothstep(0.0, 1.5, u_time);
+
+        float dither = (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
+        color += dither;
+
+        fragColor = vec4(max(color, vec3(0.0)), 1.0);
+    }`;
+
+    function compile(type, src) {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+            console.error('Shader compile error:', gl.getShaderInfoLog(s));
+            return null;
+        }
+        return s;
+    }
+
+    const vs = compile(gl.VERTEX_SHADER, VERT_SRC);
+    const fs = compile(gl.FRAGMENT_SHADER, FRAG_SRC);
+    if (!vs || !fs) return;
+
+    const prog = gl.createProgram();
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+
+    gl.useProgram(prog);
+
+    const loc = {
+        time:          gl.getUniformLocation(prog, 'u_time'),
+        resolution:    gl.getUniformLocation(prog, 'u_resolution'),
+        mouse:         gl.getUniformLocation(prog, 'u_mouse'),
+        mousePresence: gl.getUniformLocation(prog, 'u_mousePresence'),
+        clicks: Array.from({ length: MAX_CLICKS }, (_, i) =>
+            gl.getUniformLocation(prog, `u_clicks[${i}]`)
+        )
+    };
+
+    const vao = gl.createVertexArray();
+
+    let resizeTimeout = null;
+    function resize() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        canvas.width  = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+    resize();
+
+    window.addEventListener('resize', () => {
+        if (resizeTimeout) cancelAnimationFrame(resizeTimeout);
+        resizeTimeout = requestAnimationFrame(resize);
+    }, { passive: true });
+
+    const targetM   = { x: 0.5, y: 0.5 };
+    const smoothM   = { x: 0.5, y: 0.5 };
+    const velocity  = { x: 0, y: 0 };
+    let mousePresenceTarget = 0.0;
+    let mousePresence       = 0.0;
+
+    const clicks = [];
+    const startTime = performance.now() * 0.001;
+
+    function normCoord(clientX, clientY) {
+        return {
+            x: clientX / window.innerWidth,
+            y: 1.0 - clientY / window.innerHeight
+        };
+    }
+
+    function triggerClickEnergy(x, y) {
+        const t = performance.now() * 0.001 - startTime;
+        const seed = Math.random() * 6.28318;
+        clicks.push({ x, y, t, seed });
+        if (clicks.length > MAX_CLICKS) clicks.shift();
+    }
+
+    window.addEventListener('mousemove', e => {
+        const c = normCoord(e.clientX, e.clientY);
+        targetM.x = c.x;
+        targetM.y = c.y;
+        mousePresenceTarget = 1.0;
+    }, { passive: true });
+
+    window.addEventListener('mouseenter', () => { mousePresenceTarget = 1.0; }, { passive: true });
+    window.addEventListener('mouseleave', () => { mousePresenceTarget = 0.0; }, { passive: true });
+
+    window.addEventListener('mousedown', e => {
+        const c = normCoord(e.clientX, e.clientY);
+        triggerClickEnergy(c.x, c.y);
+    }, { passive: true });
+
+    window.addEventListener('touchstart', e => {
+        const touch = e.touches[0];
+        const c = normCoord(touch.clientX, touch.clientY);
+        targetM.x = c.x;
+        targetM.y = c.y;
+        mousePresenceTarget = 1.0;
+        triggerClickEnergy(c.x, c.y);
+    }, { passive: true });
+
+    window.addEventListener('touchmove', e => {
+        const touch = e.touches[0];
+        const c = normCoord(touch.clientX, touch.clientY);
+        targetM.x = c.x;
+        targetM.y = c.y;
+    }, { passive: true });
+
+    window.addEventListener('touchend', () => { mousePresenceTarget = 0.0; }, { passive: true });
+
+    function render() {
+        const now = performance.now() * 0.001;
+        const time = now - startTime;
+
+        const dx = targetM.x - smoothM.x;
+        const dy = targetM.y - smoothM.y;
+        velocity.x = (velocity.x + dx * 0.045) * 0.81;
+        velocity.y = (velocity.y + dy * 0.045) * 0.81;
+        smoothM.x += velocity.x;
+        smoothM.y += velocity.y;
+
+        mousePresence += (mousePresenceTarget - mousePresence) * 0.035;
+
+        gl.uniform1f(loc.time, time);
+        gl.uniform2f(loc.resolution, canvas.width, canvas.height);
+        gl.uniform2f(loc.mouse, smoothM.x, smoothM.y);
+        gl.uniform1f(loc.mousePresence, mousePresence);
+
+        for (let i = 0; i < MAX_CLICKS; i++) {
+            if (i < clicks.length) {
+                const c = clicks[i];
+                gl.uniform4f(loc.clicks[i], c.x, c.y, c.t, c.seed);
+            } else {
+                gl.uniform4f(loc.clicks[i], 0, 0, 0, 0);
+            }
+        }
+
+        while (clicks.length > 0 && (time - clicks[0].t) > 5.5) {
+            clicks.shift();
+        }
+
+        gl.bindVertexArray(vao);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+        requestAnimationFrame(render);
+    }
+
+    requestAnimationFrame(render);
+})();
+</script>
 </body>
 </html>
