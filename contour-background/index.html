@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="description" content="Reeflux — One App. Every Charger. Powering the future of EV charging.">
     <title>Reeflux — One App. Every Charger</title>
 
@@ -29,6 +29,7 @@
         html, body {
             width: 100%;
             height: 100%;
+            height: 100dvh;
             max-width: 100vw;
             background: var(--bg-color);
             color: var(--text-main);
@@ -48,6 +49,7 @@
             inset: 0;
             width: 100vw;
             height: 100vh;
+            height: 100dvh;
             background-color: #050505;
             z-index: 1000;
             display: flex;
@@ -143,6 +145,7 @@
             display: block;
             width: 100vw;
             height: 100vh;
+            height: 100dvh;
             position: fixed;
             top: 0; left: 0;
             z-index: 1;
@@ -156,6 +159,7 @@
             inset: 0;
             width: 100vw;
             height: 100vh;
+            height: 100dvh;
             z-index: 10;
             pointer-events: none;
             overflow: hidden;
@@ -265,7 +269,8 @@
             position: absolute;
             inset: 0;
             width: 100%;
-            height: 100%;
+            height: 100vh;
+            height: 100dvh;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -441,7 +446,7 @@
         ================================================================ */
         .scroll-chevron {
             position: absolute;
-            bottom: 2rem;
+            bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
             left: 50%;
             transform: translateX(-50%);
             display: flex;
@@ -484,7 +489,7 @@
         ================================================================ */
         .contact-btn-wrapper {
             position: fixed;
-            bottom: 2rem;
+            bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
             right: 2rem;
             z-index: 40;
             pointer-events: auto;
@@ -552,7 +557,7 @@
 
         .contact-cards-container {
             position: fixed;
-            bottom: 5.5rem;
+            bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
             right: 2rem;
             z-index: 40;
             display: flex;
@@ -619,19 +624,39 @@
             color: #ffffff;
         }
 
-        /* Responsive Mobile & Tablet Layout adjustments */
+        /* Responsive Mobile & Tablet Layout adjustments for PERFECT Optical Vertical Centering */
         @media (max-width: 768px) {
             .section-indicator-dots { left: 1rem; gap: 0.85rem; }
             .contact-btn span { display: none; }
             .contact-btn { padding: 0.85rem; border-radius: 50%; width: 48px; height: 48px; }
-            .contact-cards-container { right: 1rem; width: calc(100vw - 2rem); bottom: 5rem; }
-            .story-section { padding: 1.25rem 1rem; }
+            .contact-btn-wrapper { bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)); right: 1rem; }
+            .contact-cards-container { right: 1rem; width: calc(100vw - 2rem); bottom: calc(4.8rem + env(safe-area-inset-bottom, 0px)); }
+            
+            /* Dynamic Mobile Viewport & Safe Area Optical Centering Compensation */
+            .story-section {
+                height: 100dvh;
+                padding-top: calc(env(safe-area-inset-top, 0px) + 1rem);
+                padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2.5rem);
+            }
+
+            .preloader-overlay {
+                height: 100dvh;
+                padding-bottom: env(safe-area-inset-bottom, 0px);
+            }
+
+            /* Offset content up by ~20px so it sits DEAD CENTER between top status bar & bottom browser toolbar */
+            .section-content {
+                transform: translateY(-1.4rem);
+            }
+            .preloader-logo {
+                transform: translateY(-1.2rem);
+            }
         }
 
         @media (max-width: 480px) {
-            .section-heading { font-size: clamp(1.8rem, 7.5vw, 2.6rem); }
-            .section-body { font-size: clamp(0.92rem, 4vw, 1.1rem); }
-            .body-paragraph.highlight { font-size: clamp(1.2rem, 5vw, 1.5rem); }
+            .section-heading { font-size: clamp(1.75rem, 7.2vw, 2.5rem); }
+            .section-body { font-size: clamp(0.92rem, 3.8vw, 1.1rem); }
+            .body-paragraph.highlight { font-size: clamp(1.2rem, 4.8vw, 1.5rem); }
         }
     </style>
 </head>
